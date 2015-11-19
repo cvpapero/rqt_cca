@@ -27,12 +27,10 @@ class CCA(QtGui.QWidget):
         self.jsonInput()
 
         super(CCA, self).__init__()
-        self.eigArray = []
-        self.eigValArray = []
+
         self.initUI()
         rospy.init_node('ros_cca', anonymous=True)
         self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
 
         self.carray = []
         clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
@@ -48,30 +46,28 @@ class CCA(QtGui.QWidget):
         grid = QtGui.QGridLayout()
         form = QtGui.QFormLayout()
 
+        #window size
         self.winSizeBox = QtGui.QLineEdit()
-        self.winSizeBox.setText('30')
+        self.winSizeBox.setText('45')
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
 
+        #有意水準
+        self.sigLevelBox = QtGui.QLineEdit()
+        self.sigLevelBox.setText('0.05')
+        self.sigLevelBox.setAlignment(QtCore.Qt.AlignRight)
+        self.sigLevelBox.setFixedWidth(100)
+        form.addRow('sig level', self.sigLevelBox)
+
+        #ccaの実行
         boxExecCtrl = QtGui.QHBoxLayout()
-        btnExec = QtGui.QPushButton('exec')
+        btnExec = QtGui.QPushButton('cca')
         btnExec.clicked.connect(self.doExec)
         boxExecCtrl.addWidget(btnExec)
-        
 
-        self.AFrameBox = QtGui.QLineEdit()
-        self.AFrameBox.setText('0')
-        self.AFrameBox.setAlignment(QtCore.Qt.AlignRight)
-        self.AFrameBox.setFixedWidth(100)
-        form.addRow('A User Frame', self.AFrameBox)
-
-        self.BFrameBox = QtGui.QLineEdit()
-        self.BFrameBox.setText('0')
-        self.BFrameBox.setAlignment(QtCore.Qt.AlignRight)
-        self.BFrameBox.setFixedWidth(100)
-        form.addRow('B User Frame', self.BFrameBox)
-
+        #固有値の順位
+        self.eigArray = []
         self.eigOrder = QtGui.QComboBox(self)
         self.eigOrder.addItems(self.eigArray)
         self.eigOrder.setFixedWidth(150)
@@ -79,6 +75,7 @@ class CCA(QtGui.QWidget):
         boxEigOrder.addWidget(self.eigOrder)
         form.addRow('eigen order', boxEigOrder)
 
+        #パブリッシュ
         boxPubCtrl = QtGui.QHBoxLayout()
         btnPub = QtGui.QPushButton('pub')
         btnPub.clicked.connect(self.doPub)
@@ -94,6 +91,7 @@ class CCA(QtGui.QWidget):
         self.setWindowTitle("frame select window")
         self.show()
 
+    #fileからjointの取得
     def jsonInput(self):
         f = open('test1014.json', 'r');
         jsonData = json.load(f)
@@ -134,6 +132,7 @@ class CCA(QtGui.QWidget):
             self.time.append(itime["time"])
 
         self.dataSize = tsize
+        self.jointSize = psize
 
         #joint index
         f = open('joint_index.json', 'r');
@@ -148,20 +147,25 @@ class CCA(QtGui.QWidget):
             self.idata.append(ilist)
 
     def doExec(self):
+        print "---cca start---"
         self.winSize = int(self.winSizeBox.text())
-        self.maxRange = self.dataSize - self.winSize
+        self.sigAlf = float(self.sigLevelBox.text())
+    
+        #eig init
+        self.eigArray = []
+        self.eigValArray = []
 
         self.dataAlig()
         self.canoniCorr()
         self.bartlettTest()
         self.updateEigOrder()
+        print "---cca end---"
+        print " "
 
     def updateEigOrder(self):
         self.eigOrder.clear()
         self.eigOrder.addItems(self.eigArray)
         self.eigOrder.setFixedWidth(150)
-        #boxEigOrder = QtGui.QHBoxLayout()
-        #boxEigOrder.addWidget(self.eigOrder)
 
     #データの整頓(winsize分だけ並べる)
     def dataAlig(self):
@@ -193,16 +197,8 @@ class CCA(QtGui.QWidget):
         sX = tX - tX.mean(axis=0) 
         sY = tY - tY.mean(axis=0)
 
-        #print "sX:"
-        #print sX
-
         S = np.cov(sX.T, sY.T, bias = 1)
 
-        #print "cov:"
-        #print S
-
-        #p,q = S.shape
-        #p = p/2
         SXX = S[:self.p,:self.p]
         SYY = S[self.p:,self.p:]
         SXY = S[:self.p,self.p:]
@@ -216,51 +212,49 @@ class CCA(QtGui.QWidget):
  
     def bartlettTest(self):
         M = -(self.n-1/2*(self.p+self.q+3))
-        #print "M:"+str(M)
+
         for i in range(len(self.s)):
             #有意水準を求める
-            alf = 0.01
+            alf = self.sigAlf
             sig = sp.special.chdtri((self.p-i)*(self.q-i), alf)
-            print
             test = 1
+
+            #ウィルクスのラムダ
             for j in range(len(self.s)-i):
                 test = test*(1-self.s[len(self.s)-j-1])
             chi = M*math.log(test)
 
+            #帰無仮説棄却/採用
             if chi > sig:
                 print  "test["+str(i)+"]:"+str(chi) +" > sig("+str(alf)+"):"+str(sig)
-                ru = np.fabs(self.A[:,i:i+1])
-                rv = np.fabs(self.B[:,i:i+1])
-                arg_u = np.argmax(ru)
-                arg_v = np.argmax(rv)
+                run = np.fabs(self.A[:,i:i+1])
+                rvn = np.fabs(self.B[:,i:i+1])
+                arg_u = np.argmax(run)
+                arg_v = np.argmax(rvn)
                 self.eigArray.append(str(i))
                 val = [arg_u, arg_v]
                 self.eigValArray.append(val)
-                print "ru-max arg:"+str(np.argmax(ru))
-                print "rv-max arg:"+str(np.argmax(rv))
-                #print "---"
+                print "eigen:"+str(np.sqrt(self.s[i]))
+                print "ru-max arg:"+str(arg_u)
+                print "rv-max arg:"+str(arg_v)
             else:
                 break
 
 
 
     def doPub(self):
-        print "pub!"
-
+        print "---play back start---"
         idx = int(self.eigOrder.currentText())
-        print idx
-
+        print "eig order:"+str(idx)+", value:"+str(np.sqrt(self.s[idx]))
         self.winSize = int(self.winSizeBox.text())
-        
-        #Ast = float(self.AFrameBox.text())
-        #Bst = float(self.BFrameBox.text())
         Ast = self.eigValArray[idx][0]
         Bst = self.eigValArray[idx][1]
-        print Ast
-        print Bst
+        print "User1 frame:"+str(Ast)
+        print "User2 frame:"+str(Bst)
         self.pubViz(Ast, Bst)
 
-        print "end"
+        print "---play back end---"
+        print " "
 
     def pubViz(self, ast, bst):
 
@@ -272,7 +266,7 @@ class CCA(QtGui.QWidget):
             
             #use1について
             msg = Marker()
-            #いろんなプロパティ
+            #markerのプロパティ
             msg.header.frame_id = 'camera_link'
             msg.header.stamp = rospy.Time.now()
             msg.ns = 'j1'
@@ -283,7 +277,7 @@ class CCA(QtGui.QWidget):
             msg.scale.y = 0.1
             msg.color = self.carray[2]
             #ジョイントポイントを入れる処理
-            for j1 in range(len(self.pdata[0][ast+i])):
+            for j1 in range(self.jointSize):
                 point = Point()
                 point.x = self.pdata[0][ast+i][j1][0]
                 point.y = self.pdata[0][ast+i][j1][1]
@@ -303,7 +297,7 @@ class CCA(QtGui.QWidget):
             msg.scale.y = 0.1
             msg.color = self.carray[1]
 
-            for j2 in range(len(self.pdata[0][bst+i])):
+            for j2 in range(self.jointSize):
                 point = Point()
                 point.x = self.pdata[1][bst+i][j2][0]
                 point.y = self.pdata[1][bst+i][j2][1]
