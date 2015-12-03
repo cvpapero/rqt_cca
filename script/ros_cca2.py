@@ -1,0 +1,321 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+#そもそもの考え方が間違っていたので書き直す
+
+import sys
+import math
+import json
+import numpy as np
+import scipy as sp
+from scipy import linalg as LA
+from scipy import stats as ST
+
+from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import *
+from PyQt4.QtGui  import *
+
+import rospy
+from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import Marker
+from geometry_msgs.msg import Point
+from geometry_msgs.msg import PointStamped
+from std_msgs.msg import ColorRGBA
+
+class CCA(QtGui.QWidget):
+
+    def __init__(self):
+        self.jsonInput()
+
+        super(CCA, self).__init__()
+
+        self.initUI()
+        rospy.init_node('ros_cca', anonymous=True)
+        self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
+
+        self.carray = []
+        clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
+        for c in clist:
+            color = ColorRGBA()
+            color.r = c[0]
+            color.g = c[1]
+            color.b = c[2]
+            color.a = c[3]
+            self.carray.append(color) 
+
+    def initUI(self):
+        grid = QtGui.QGridLayout()
+        form = QtGui.QFormLayout()
+
+        #window size
+        self.winSizeBox = QtGui.QLineEdit()
+        self.winSizeBox.setText('45')
+        self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
+        self.winSizeBox.setFixedWidth(100)
+        form.addRow('window size', self.winSizeBox)
+
+        #有意水準
+        self.sigLevelBox = QtGui.QLineEdit()
+        self.sigLevelBox.setText('0.05')
+        self.sigLevelBox.setAlignment(QtCore.Qt.AlignRight)
+        self.sigLevelBox.setFixedWidth(100)
+        form.addRow('sig level', self.sigLevelBox)
+
+        #ccaの実行
+        boxExecCtrl = QtGui.QHBoxLayout()
+        btnExec = QtGui.QPushButton('cca')
+        btnExec.clicked.connect(self.doExec)
+        boxExecCtrl.addWidget(btnExec)
+
+        #固有値の順位
+        self.eigArray = []
+        self.eigOrder = QtGui.QComboBox(self)
+        self.eigOrder.addItems(self.eigArray)
+        self.eigOrder.setFixedWidth(150)
+        boxEigOrder = QtGui.QHBoxLayout()
+        boxEigOrder.addWidget(self.eigOrder)
+        form.addRow('eigen order', boxEigOrder)
+
+        #パブリッシュ
+        boxPubCtrl = QtGui.QHBoxLayout()
+        btnPub = QtGui.QPushButton('pub')
+        btnPub.clicked.connect(self.doPub)
+        boxPubCtrl.addWidget(btnPub)
+
+        grid.addLayout(form,1,0)
+        grid.addLayout(boxExecCtrl,2,0)
+        grid.addLayout(boxPubCtrl,2,1)
+
+        self.setLayout(grid)
+        self.resize(400,100)
+        
+        self.setWindowTitle("frame select window")
+        self.show()
+
+    #fileからjointの取得
+    def jsonInput(self):
+        f = open('test1014.json', 'r');
+        jsonData = json.load(f)
+        #print json.dumps(jsonData, sort_keys = True, indent = 4)
+        f.close()
+
+        self.data = {}
+        self.pdata = {}
+        self.jdatas = []
+        self.time = []
+        self.usrSize = len(jsonData)
+
+        u = 0;
+
+        for user in jsonData:
+            datas = []
+            tsize = len(user["datas"])
+            psize = len(user["datas"][0]["jdata"])            
+
+            pobj = {}
+            for t in range(tsize):
+                #angle
+                datas.append(user["datas"][t]["data"])
+                #points
+                plist = []
+                for p in range(psize):
+                    pl = []
+                    pl.append(user["datas"][t]["jdata"][p][0])
+                    pl.append(user["datas"][t]["jdata"][p][1])
+                    pl.append(user["datas"][t]["jdata"][p][2])
+                    plist.append(pl)
+                pobj[t] = plist
+            self.jdatas.append(datas)
+            self.pdata[u] = pobj
+            u+=1
+        
+        for itime in jsonData[0]["datas"]:
+            self.time.append(itime["time"])
+
+        self.dataSize = tsize
+        self.jointSize = psize
+
+        #joint index
+        f = open('joint_index.json', 'r');
+        jsonIndexData = json.load(f)
+        #print json.dumps(jsonData, sort_keys = True, indent = 4)
+        f.close()
+        self.idata = []
+        for index in jsonIndexData:
+            ilist = []
+            for i in index:
+                ilist.append(i)
+            self.idata.append(ilist)
+
+    def doExec(self):
+        print "---cca start---"
+        self.winSize = int(self.winSizeBox.text())
+        self.sigAlf = float(self.sigLevelBox.text())
+    
+        #eig init
+        self.eigArray = []
+        self.eigValArray = []
+
+        self.dataAlig()
+        self.canoniCorr()
+        self.bartlettTest()
+        self.updateEigOrder()
+        print "---cca end---"
+        print " "
+
+    def updateEigOrder(self):
+        self.eigOrder.clear()
+        self.eigOrder.addItems(self.eigArray)
+        self.eigOrder.setFixedWidth(150)
+
+    #データの整頓(winsize分だけ並べる)
+    def dataAlig(self):
+
+        self.X = []
+        self.Y = []
+
+        self.range = self.dataSize-self.winSize+1
+
+        for i in range(self.range):
+            data = []
+            for w in range(self.winSize):
+                data.extend(self.jdatas[0][w+i])
+            self.X.append(data)
+       
+        for i in range(self.range):
+            data = []
+            for w in range(self.winSize):
+                data.extend(self.jdatas[1][w+i])
+            self.Y.append(data)
+       
+    #正準相関
+    def canoniCorr(self):
+        tX = np.matrix(self.X).T
+        tY = np.matrix(self.Y).T
+        self.n, self.p = tX.shape
+        self.n, self.q = tY.shape
+
+        sX = tX - tX.mean(axis=0) 
+        sY = tY - tY.mean(axis=0)
+
+        S = np.cov(sX.T, sY.T, bias = 1)
+
+        SXX = S[:self.p,:self.p]
+        SYY = S[self.p:,self.p:]
+        SXY = S[:self.p,self.p:]
+        SYX = S[self.p:,:self.p]
+
+        sqx = LA.sqrtm(LA.inv(SXX)) # SXX^(-1/2)
+        sqy = LA.sqrtm(LA.inv(SYY)) # SYY^(-1/2)
+        M = np.dot(np.dot(sqx, SXY), sqy.T) # SXX^(-1/2) * SXY * SYY^(-T/2)
+        self.A, self.s, Bh = LA.svd(M, full_matrices=False)
+        self.B = Bh.T
+ 
+    def bartlettTest(self):
+        M = -(self.n-1/2*(self.p+self.q+3))
+
+        for i in range(len(self.s)):
+            #有意水準を求める
+            alf = self.sigAlf
+            sig = sp.special.chdtri((self.p-i)*(self.q-i), alf)
+            test = 1
+
+            #ウィルクスのラムダ
+            for j in range(len(self.s)-i):
+                test = test*(1-self.s[len(self.s)-j-1])
+            chi = M*math.log(test)
+
+            #帰無仮説棄却/採用
+            if chi > sig:
+                print  "test["+str(i)+"]:"+str(chi) +" > sig("+str(alf)+"):"+str(sig)
+                run = np.fabs(self.A[:,i:i+1])
+                rvn = np.fabs(self.B[:,i:i+1])
+                arg_u = np.argmax(run)
+                arg_v = np.argmax(rvn)
+                self.eigArray.append(str(i))
+                val = [arg_u, arg_v]
+                self.eigValArray.append(val)
+                print "eigen:"+str(np.sqrt(self.s[i]))
+                print "ru-max arg:"+str(arg_u)
+                print "rv-max arg:"+str(arg_v)
+            else:
+                break
+
+
+
+    def doPub(self):
+        print "---play back start---"
+        idx = int(self.eigOrder.currentText())
+        print "eig order:"+str(idx)+", value:"+str(np.sqrt(self.s[idx]))
+        self.winSize = int(self.winSizeBox.text())
+        Ast = self.eigValArray[idx][0]
+        Bst = self.eigValArray[idx][1]
+        print "User1 frame:"+str(Ast)
+        print "User2 frame:"+str(Bst)
+        self.pubViz(Ast, Bst)
+
+        print "---play back end---"
+        print " "
+
+    def pubViz(self, ast, bst):
+
+        rate = rospy.Rate(10)
+
+        for i in range(self.winSize):
+
+            msgs = MarkerArray()
+            
+            #use1について
+            msg = Marker()
+            #markerのプロパティ
+            msg.header.frame_id = 'camera_link'
+            msg.header.stamp = rospy.Time.now()
+            msg.ns = 'j1'
+            msg.action = 0
+            msg.id = 1
+            msg.type = 8
+            msg.scale.x = 0.1
+            msg.scale.y = 0.1
+            msg.color = self.carray[2]
+            #ジョイントポイントを入れる処理
+            for j1 in range(self.jointSize):
+                point = Point()
+                point.x = self.pdata[0][ast+i][j1][0]
+                point.y = self.pdata[0][ast+i][j1][1]
+                point.z = self.pdata[0][ast+i][j1][2]
+                msg.points.append(point) 
+            msg.pose.orientation.w = 1.0
+            msgs.markers.append(msg)    
+            
+            msg = Marker()
+            msg.header.frame_id = 'camera_link'
+            msg.header.stamp = rospy.Time.now()
+            msg.ns = 'j2'
+            msg.action = 0
+            msg.id = 2
+            msg.type = 8
+            msg.scale.x = 0.1
+            msg.scale.y = 0.1
+            msg.color = self.carray[1]
+
+            for j2 in range(self.jointSize):
+                point = Point()
+                point.x = self.pdata[1][bst+i][j2][0]
+                point.y = self.pdata[1][bst+i][j2][1]
+                point.z = self.pdata[1][bst+i][j2][2]
+                msg.points.append(point) 
+            msg.pose.orientation.w = 1.0
+
+            msgs.markers.append(msg)
+
+            self.mpub.publish(msgs)
+            rate.sleep()
+
+def main():
+    app = QtGui.QApplication(sys.argv)
+    cca = CCA()
+    sys.exit(app.exec_())
+
+
+if __name__=='__main__':
+    main()
