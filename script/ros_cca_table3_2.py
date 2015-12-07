@@ -1,6 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+#一定フレーム内同士で計算する
+#それ以外では計算しない(たぶん、関連が無いから)
+#バートレット検定で第何位までの成分を使うか決める
+
 
 #import sys
 #import math
@@ -31,8 +35,6 @@ class CCA(QtGui.QWidget):
 
     def __init__(self):
 
-
-
         super(CCA, self).__init__()
 
         #UIの初期化
@@ -42,7 +44,7 @@ class CCA(QtGui.QWidget):
         #self.jsonInput()
 
         #ROSのパブリッシャなどの初期化
-        rospy.init_node('ros_cca_table', anonymous=True)
+        rospy.init_node('ros_cca_table3', anonymous=True)
         self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
 
@@ -74,10 +76,17 @@ class CCA(QtGui.QWidget):
 
         #window size
         self.winSizeBox = QtGui.QLineEdit()
-        self.winSizeBox.setText('40')
+        self.winSizeBox.setText('3')
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
+
+        #frame size
+        self.frmSizeBox = QtGui.QLineEdit()
+        self.frmSizeBox.setText('6')
+        self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
+        self.frmSizeBox.setFixedWidth(100)
+        form.addRow('frame size', self.frmSizeBox)
 
         #tableに表示する相関係数のしきい値
         self.ThesholdBox = QtGui.QLineEdit()
@@ -135,8 +144,6 @@ class CCA(QtGui.QWidget):
         self.setWindowTitle("cca window")
         self.show()
 
-    def fileSelect(self):
-        self.filename = QtGui.QFileDialog.getOpenFileName(self, 'Open file', os.path.expanduser('~') + '/Desktop')
 
     def chooseDbFile(self):
         dialog = QtGui.QFileDialog()
@@ -187,6 +194,8 @@ class CCA(QtGui.QWidget):
 
         self.winSize = int(self.winSizeBox.text())
 
+        self.frmSize = int(self.frmSizeBox.text())
+
         self.canoniExec1()
         #self.time_setting()
         self.updateTable()
@@ -202,7 +211,7 @@ class CCA(QtGui.QWidget):
         self.table.clear()
         font = QtGui.QFont()
         font.setFamily(u"DejaVu Sans")
-        font.setPointSize(1)
+        font.setPointSize(5)
         
         self.table.horizontalHeader().setFont(font)
         self.table.verticalHeader().setFont(font)
@@ -230,9 +239,9 @@ class CCA(QtGui.QWidget):
                     self.table.horizontalHeaderItem(j).setToolTip(str(j))
                     hot = False
                     
-                c = 255
+                c = 0
                 if self.ccaMat[i][j] > self.threshold:
-                    c = (1-self.ccaMat[i][j])*255
+                    c = self.ccaMat[i][j]*255
 
                 self.table.setItem(i, j, QtGui.QTableWidgetItem())
                 self.table.item(i, j).setBackground(QtGui.QColor(c,c,c))
@@ -243,32 +252,59 @@ class CCA(QtGui.QWidget):
 
     def canoniExec1(self):
 
-        self.dataRange = self.datasSize - self.winSize + 1
+        self.dataMaxRange = self.datasSize - self.winSize + 1
+        self.ccaMat = [[0 for i in range(self.dataMaxRange)] for j in range(self.dataMaxRange)]
 
-        self.ccaMat = [[0 for i in range(self.dataRange)] for j in range(self.dataRange)]
+        self.frameRange = self.datasSize - self.frmSize + 1
+        self.dataRange = self.frmSize - self.winSize + 1
+        
+        print "datasSize:"+str(self.datasSize)
+        print "dataMaxRange:"+str(self.dataMaxRange)
+        print "frameRange:"+str(self.frameRange)
+        print "dataRange:"+str(self.dataRange)
 
-        for t1 in range(self.dataRange):
-            rho = 0
-            time1 = 0
-            time2 = 0
-            for t2 in range(self.dataRange):
-                USER1 = []
-                USER2 = []
-                for w in range(self.winSize):
-                    USER1.append(self.DATAS[0][t1+w])
-                    USER2.append(self.DATAS[1][t2+w])
-                    
-                tmp_rho = self.canoniCorr(USER1, USER2)
-                self.ccaMat[t1][t2] = float(tmp_rho)
-                #print "tmp_rho"+str(tmp_rho)
-                
-                if math.fabs(tmp_rho) > math.fabs(rho):
-                    rho = tmp_rho                
-                    time1 = t1
-                    time2 = t2
-                
-            print "---"
-            print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
+        for f in range(self.frameRange):
+            print "f:"+str(f)+"---"
+            if f == 0:
+                for t1 in range(self.dataRange):
+                    rho = 0
+                    time1 = 0
+                    time2 = 0
+                    for t2 in range(self.dataRange):
+                        USER1 = []
+                        USER2 = []
+                        for w in range(self.winSize):
+                            USER1.append(self.DATAS[0][t1+f+w])
+                            USER2.append(self.DATAS[1][t2+f+w])
+                        
+                        tmp_rho = self.canoniCorr(USER1, USER2)
+                        self.ccaMat[t1+f][t2+f] = float(tmp_rho)
+                        #print "tmp_rho"+str(tmp_rho)
+                        
+                        if math.fabs(tmp_rho) > math.fabs(rho):
+                            rho = tmp_rho                
+                            time1 = t1
+                            time2 = t2
+            else:
+                for t1 in range(self.dataRange - 1):
+                    USER1=[]
+                    USER2=[]
+                    for w in range(self.winSize):
+                        USER1.append(self.DATAS[0][f+t1+w])
+                        USER2.append(self.DATAS[1][f+self.dataRange-1+w])
+                    tmp_rho = self.canoniCorr(USER1, USER2)
+                    self.ccaMat[f+t1][f+self.dataRange-1] = float(tmp_rho) 
+                for t2 in range(self.dataRange):
+                    USER1=[]
+                    USER2=[]
+                    for w in range(self.winSize):
+                        USER1.append(self.DATAS[0][f+self.dataRange-1+w])
+                        USER2.append(self.DATAS[1][f+t2+w])
+                    tmp_rho = self.canoniCorr(USER1, USER2)
+                    self.ccaMat[f+self.dataRange-1][f+t2] = float(tmp_rho)
+
+            #print "---"
+            #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
 
 
     #正準相関
@@ -294,31 +330,60 @@ class CCA(QtGui.QWidget):
         #固有値問題
         #eighは実対称行列のみ, 固有値・ベクトルは昇順(小→大)
         lambs, vecs = LA.eigh(a)
-
-        #最大の固有値・ベクトルをとる
+        rho = 0
+        srho = 0
         vr, vc = vecs.shape
-        vec1 = vecs[:,vc-1:vc]
-        lamb = np.sqrt(lambs[vc-1])
-        vec2 = np.dot(sxy.T, vec1)/lamb
-        
-        v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
-        v1sxxv1 = np.dot(np.dot(vec1.T,sxx),vec1)
-        v2syyv2 = np.dot(np.dot(vec2.T,syy),vec2)
 
-        rho = v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
-        return rho
+        #print "vecs:"
+        #print vecs
+        #print "lambs:"
+        #print lambs
 
-    """
-    def time_setting(self):
-        count = 0
-        self.timedata = []
-        for dt in range(-self.maxRange, self.maxRange+1):
-            if dt > 0:
-                self.timedata.append(self.time[abs(dt)]-self.time[0])
-            if dt <= 0:
-                self.timedata.append(self.time[0]-self.time[abs(dt)])
-                    
-    """
+        d = 3
+        for i in range(d):
+            vec1 = vecs[:,vc-i-1:vc-i]
+            lamb = np.sqrt(lambs[vc-i-1])
+            vec2 = np.dot(sxy.T, vec1)/lamb
+
+            v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
+            v1sxxv1 = np.dot(np.dot(vec1.T,sxx),vec1)
+            v2syyv2 = np.dot(np.dot(vec2.T,syy),vec2)
+
+            rho = v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
+            srho = srho + rho 
+           # print float(rho)
+
+        return float(srho)/d
+
+
+
+    def bartlettTest(self):
+
+        M = -(self.n-1/2*(self.p+self.q+3))
+        #print "M:"+str(M)
+        for i in range(len(self.s)):
+            #有意水準を求める
+            alf = 0.01
+            sig = sp.special.chdtri((self.p-i)*(self.q-i), alf)
+            print
+            test = 1
+            for j in range(len(self.s)-i):
+                test = test*(1-self.s[len(self.s)-j-1])
+            chi = M*math.log(test)
+
+            if chi > sig:
+                print  "test["+str(i)+"]:"+str(chi) +" > sig("+str(alf)+"):"+str(sig)
+                ru = np.fabs(self.A[:,i:i+1])
+                rv = np.fabs(self.B[:,i:i+1])
+                #ru = self.A[:,i:i+1]
+                #rv = self.B[:,i:i+1]
+                #print "ru-max val:"+str(np.max(ru))+", arg:"+str(np.argmax(ru))
+                #print "rv-max val:"+str(np.max(rv))+", arg:"+str(np.argmax(rv))
+                print "ru-max arg:"+str(np.argmax(ru))
+                print "rv-max arg:"+str(np.argmax(rv))
+                #print "---"
+            else:
+                break
 
 
 def main():

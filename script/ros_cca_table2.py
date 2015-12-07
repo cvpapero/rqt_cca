@@ -1,6 +1,8 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+#一定フレーム内同士で計算する
+#それ以外では計算しない(たぶん、関連が無いから)
 
 #import sys
 #import math
@@ -30,8 +32,6 @@ from std_msgs.msg import ColorRGBA
 class CCA(QtGui.QWidget):
 
     def __init__(self):
-
-
 
         super(CCA, self).__init__()
 
@@ -78,6 +78,13 @@ class CCA(QtGui.QWidget):
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
+
+        #frame size
+        self.frmSizeBox = QtGui.QLineEdit()
+        self.frmSizeBox.setText('100')
+        self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
+        self.frmSizeBox.setFixedWidth(100)
+        form.addRow('frame size', self.frmSizeBox)
 
         #tableに表示する相関係数のしきい値
         self.ThesholdBox = QtGui.QLineEdit()
@@ -187,6 +194,8 @@ class CCA(QtGui.QWidget):
 
         self.winSize = int(self.winSizeBox.text())
 
+        self.frmSize = int(self.frmSizeBox.text())
+
         self.canoniExec1()
         #self.time_setting()
         self.updateTable()
@@ -202,7 +211,7 @@ class CCA(QtGui.QWidget):
         self.table.clear()
         font = QtGui.QFont()
         font.setFamily(u"DejaVu Sans")
-        font.setPointSize(1)
+        font.setPointSize(5)
         
         self.table.horizontalHeader().setFont(font)
         self.table.verticalHeader().setFont(font)
@@ -243,29 +252,39 @@ class CCA(QtGui.QWidget):
 
     def canoniExec1(self):
 
-        self.dataRange = self.datasSize - self.winSize + 1
+        self.dataMaxRange = self.datasSize - self.winSize + 1
+        self.ccaMat = [[0 for i in range(self.dataMaxRange)] for j in range(self.dataMaxRange)]
 
-        self.ccaMat = [[0 for i in range(self.dataRange)] for j in range(self.dataRange)]
+        self.frameRange = self.datasSize - self.frmSize + 1
+        self.dataRange = self.frmSize - self.winSize + 1
+        
+        print "datasSize:"+str(self.datasSize)
+        print "dataMaxRange:"+str(self.dataMaxRange)
+        print "frameRange:"+str(self.frameRange)
+        print "dataRange:"+str(self.dataRange)
 
-        for t1 in range(self.dataRange):
-            rho = 0
-            time1 = 0
-            time2 = 0
-            for t2 in range(self.dataRange):
-                USER1 = []
-                USER2 = []
-                for w in range(self.winSize):
-                    USER1.append(self.DATAS[0][t1+w])
-                    USER2.append(self.DATAS[1][t2+w])
-                    
-                tmp_rho = self.canoniCorr(USER1, USER2)
-                self.ccaMat[t1][t2] = float(tmp_rho)
-                #print "tmp_rho"+str(tmp_rho)
-                
-                if math.fabs(tmp_rho) > math.fabs(rho):
-                    rho = tmp_rho                
-                    time1 = t1
-                    time2 = t2
+        #どうする？？
+        for f in range(self.frameRange):
+            print "f:"+str(f)+"---"
+            for t1 in range(self.dataRange):
+                rho = 0
+                time1 = 0
+                time2 = 0
+                for t2 in range(self.dataRange):
+                    USER1 = []
+                    USER2 = []
+                    for w in range(self.winSize):
+                        USER1.append(self.DATAS[0][t1+f+w])
+                        USER2.append(self.DATAS[1][t2+f+w])
+                        
+                    tmp_rho = self.canoniCorr(USER1, USER2)
+                    self.ccaMat[t1+f][t2+f] = float(tmp_rho)
+                    #print "tmp_rho"+str(tmp_rho)
+                        
+                    if math.fabs(tmp_rho) > math.fabs(rho):
+                        rho = tmp_rho                
+                        time1 = t1
+                        time2 = t2
                 
             print "---"
             print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))

@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+#二つの異なるデータを読み込む
 
 #import sys
 #import math
@@ -31,8 +32,6 @@ class CCA(QtGui.QWidget):
 
     def __init__(self):
 
-
-
         super(CCA, self).__init__()
 
         #UIの初期化
@@ -60,18 +59,30 @@ class CCA(QtGui.QWidget):
     def initUI(self):
         grid = QtGui.QGridLayout()
         form = QtGui.QFormLayout()
-        
+        """
         #ファイル入力ボックス
-        self.txtSepFile = QtGui.QLineEdit()
-        btnSepFile = QtGui.QPushButton('...')
-        btnSepFile.setMaximumWidth(40)
-        btnSepFile.clicked.connect(self.chooseDbFile)
-        boxSepFile = QtGui.QHBoxLayout()
-        boxSepFile.addWidget(self.txtSepFile)
-        boxSepFile.addWidget(btnSepFile)
-        form.addRow('input file', boxSepFile)
-        
-
+        self.txtSepFile = []
+        self.txtSepFile.append(QtGui.QLineEdit())
+        btnSepFile1 = QtGui.QPushButton('...')
+        btnSepFile1.setMaximumWidth(40)
+        self.fileIndex = 0
+        btnSepFile1.clicked.connect(self.chooseDbFile)
+        boxSepFile1 = QtGui.QHBoxLayout()
+        boxSepFile1.addWidget(self.txtSepFile[0])
+        boxSepFile1.addWidget(btnSepFile1)
+        form.addRow('input file 1', boxSepFile1)
+      
+        #ファイル入力ボックス2
+        self.txtSepFile.append(QtGui.QLineEdit())
+        btnSepFile2 = QtGui.QPushButton('...')
+        btnSepFile2.setMaximumWidth(40)
+        self.fileIndex = 1
+        btnSepFile2.clicked.connect(self.chooseDbFile)
+        boxSepFile2 = QtGui.QHBoxLayout()
+        boxSepFile2.addWidget(self.txtSepFile[1])
+        boxSepFile2.addWidget(btnSepFile2)
+        form.addRow('input file 2', boxSepFile2)  
+        """
         #window size
         self.winSizeBox = QtGui.QLineEdit()
         self.winSizeBox.setText('40')
@@ -135,48 +146,78 @@ class CCA(QtGui.QWidget):
         self.setWindowTitle("cca window")
         self.show()
 
-    def fileSelect(self):
-        self.filename = QtGui.QFileDialog.getOpenFileName(self, 'Open file', os.path.expanduser('~') + '/Desktop')
-
+    """
     def chooseDbFile(self):
         dialog = QtGui.QFileDialog()
         dialog.setFileMode(QtGui.QFileDialog.ExistingFile)
         if dialog.exec_():
             fileNames = dialog.selectedFiles()
             for f in fileNames:
-                self.txtSepFile.setText(f)
+                self.txtSepFile[self.fileIndex].setText(f)
                 return
-        return self.txtSepFile.setText('')
-
+        return self.txtSepFile[self.fileIndex].setText('')
+    """
 
     def jsonInput(self):
-        #filename = QtGui.QFileDialog.getOpenFileName(self, 'Open file', os.path.expanduser('~') + '/Desktop')
-        filename = self.txtSepFile.text()
+        """
+        self.DATAS = []
+        dSize = []
+        for i in range(len(self.txtSepFile)): 
+            filename = self.txtSepFile[i].text()
 
-        #f = open('test1014.json', 'r')
-        f = open(filename, 'r')
-        jsonData = json.load(f)
-        #print json.dumps(jsonData, sort_keys = True, indent = 4)
-        f.close()
+            #f = open('test1014.json', 'r')
+            f = open(filename, 'r')
+            jsonData = json.load(f)
+            #print json.dumps(jsonData, sort_keys = True, indent = 4)
+            f.close()
+
+            for user in jsonData:
+                #angle
+                data = []
+                
+                dSize[i] = len(user["datas"])
+
+                for j in range(self.datasSize):
+                    data.append(user["datas"][j]["data"])
+                    
+                self.DATAS.append(data)
+
+            self.datasSize = dSize[0] if dSize[0] < dSize[1] else dSize[1]
+        """
+        
+        filenames = []
+        filenames.append("1test124.json")
+        filenames.append("2test124.json")
+        
+        jsonData = []
+        dSize = []
+
+        for i in range(len(filenames)): 
+            filename = filenames[i] #self.txtSepFile[i].text()
+            f = open(filename, 'r')
+            jsonData.append(json.load(f))
+            dSize.append(len(jsonData[i][0]["datas"]))
+            #print "jsondata[i]"+str(jsonData[i][0]["datas"])
+
+
+        self.datasSize = dSize[0] if dSize[0] < dSize[1] else dSize[1]
+
+        print "datasSize:"+str(self.datasSize)
 
         self.DATAS = []
 
-        for user in jsonData:
-            #angle
-            data = []
-            self.datasSize = len(user["datas"])
-
+        for i in range(len(filenames)):
+            data = [] 
             for j in range(self.datasSize):
-                data.append(user["datas"][j]["data"])
-
+                data.append(jsonData[i][0]["datas"][j]["data"])
             self.DATAS.append(data)
 
-        """
-        print "DATAS[0]:"
-        print self.DATAS[0]
-        print "DATAS[1]:"
-        print self.DATAS[1]
-        """
+        #データをdetasSizeでカットする
+        #print "DATAS[0]:"
+        #print self.DATAS[0]
+        #print "DATAS[1]:"
+        #print self.DATAS[1]
+        
 
 
     def doExec(self):
@@ -202,7 +243,7 @@ class CCA(QtGui.QWidget):
         self.table.clear()
         font = QtGui.QFont()
         font.setFamily(u"DejaVu Sans")
-        font.setPointSize(1)
+        font.setPointSize(5)
         
         self.table.horizontalHeader().setFont(font)
         self.table.verticalHeader().setFont(font)
@@ -232,7 +273,7 @@ class CCA(QtGui.QWidget):
                     
                 c = 255
                 if self.ccaMat[i][j] > self.threshold:
-                    c = (1-self.ccaMat[i][j])*255
+                    c = self.ccaMat[i][j] * 255
 
                 self.table.setItem(i, j, QtGui.QTableWidgetItem())
                 self.table.item(i, j).setBackground(QtGui.QColor(c,c,c))
