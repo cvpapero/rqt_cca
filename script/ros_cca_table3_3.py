@@ -3,6 +3,8 @@
 
 #一定フレーム内同士で計算する
 #それ以外では計算しない(たぶん、関連が無いから)
+#バートレット検定で第何位までの成分を使うか決める
+#松尾さんの正規化
 
 #import sys
 #import math
@@ -14,6 +16,7 @@ import os.path
 import math
 import json
 import numpy as np
+from numpy import linalg as NLA
 import scipy as sp
 from scipy import linalg as LA
 from scipy import stats as ST
@@ -42,7 +45,7 @@ class CCA(QtGui.QWidget):
         #self.jsonInput()
 
         #ROSのパブリッシャなどの初期化
-        rospy.init_node('ros_cca_table', anonymous=True)
+        rospy.init_node('ros_cca_table3', anonymous=True)
         self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
 
@@ -74,14 +77,14 @@ class CCA(QtGui.QWidget):
 
         #window size
         self.winSizeBox = QtGui.QLineEdit()
-        self.winSizeBox.setText('40')
+        self.winSizeBox.setText('3')
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('100')
+        self.frmSizeBox.setText('6')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -142,8 +145,6 @@ class CCA(QtGui.QWidget):
         self.setWindowTitle("cca window")
         self.show()
 
-    def fileSelect(self):
-        self.filename = QtGui.QFileDialog.getOpenFileName(self, 'Open file', os.path.expanduser('~') + '/Desktop')
 
     def chooseDbFile(self):
         dialog = QtGui.QFileDialog()
@@ -239,9 +240,9 @@ class CCA(QtGui.QWidget):
                     self.table.horizontalHeaderItem(j).setToolTip(str(j))
                     hot = False
                     
-                c = 255
+                c = 0
                 if self.ccaMat[i][j] > self.threshold:
-                    c = (1-self.ccaMat[i][j])*255
+                    c = self.ccaMat[i][j]*255
 
                 self.table.setItem(i, j, QtGui.QTableWidgetItem())
                 self.table.item(i, j).setBackground(QtGui.QColor(c,c,c))
@@ -263,32 +264,191 @@ class CCA(QtGui.QWidget):
         print "frameRange:"+str(self.frameRange)
         print "dataRange:"+str(self.dataRange)
 
-        #どうする？？
         for f in range(self.frameRange):
             print "f:"+str(f)+"---"
-            for t1 in range(self.dataRange):
-                rho = 0
-                time1 = 0
-                time2 = 0
-                for t2 in range(self.dataRange):
-                    USER1 = []
-                    USER2 = []
+            if f == 0:
+                for t1 in range(self.dataRange):
+                    rho = 0
+                    time1 = 0
+                    time2 = 0
+                    for t2 in range(self.dataRange):
+                        USER1 = []
+                        USER2 = []
+                        for w in range(self.winSize):
+                            USER1.append(self.DATAS[0][t1+f+w])
+                            USER2.append(self.DATAS[1][t2+f+w])
+                        
+                        tmp_rho = self.canoniCorr(USER1, USER2)
+                        self.ccaMat[t1+f][t2+f] = float(tmp_rho)
+                        #print "tmp_rho"+str(tmp_rho)
+                        
+                        if math.fabs(tmp_rho) > math.fabs(rho):
+                            rho = tmp_rho                
+                            time1 = t1
+                            time2 = t2
+            else:
+                for t1 in range(self.dataRange - 1):
+                    USER1=[]
+                    USER2=[]
                     for w in range(self.winSize):
-                        USER1.append(self.DATAS[0][t1+f+w])
-                        USER2.append(self.DATAS[1][t2+f+w])
-                        
+                        USER1.append(self.DATAS[0][f+t1+w])
+                        USER2.append(self.DATAS[1][f+self.dataRange-1+w])
                     tmp_rho = self.canoniCorr(USER1, USER2)
-                    self.ccaMat[t1+f][t2+f] = float(tmp_rho)
-                    #print "tmp_rho"+str(tmp_rho)
-                        
-                    if math.fabs(tmp_rho) > math.fabs(rho):
-                        rho = tmp_rho                
-                        time1 = t1
-                        time2 = t2
-                
-            print "---"
-            print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
+                    self.ccaMat[f+t1][f+self.dataRange-1] = float(tmp_rho) 
+                for t2 in range(self.dataRange):
+                    USER1=[]
+                    USER2=[]
+                    for w in range(self.winSize):
+                        USER1.append(self.DATAS[0][f+self.dataRange-1+w])
+                        USER2.append(self.DATAS[1][f+t2+w])
+                    tmp_rho = self.canoniCorr(USER1, USER2)
+                    self.ccaMat[f+self.dataRange-1][f+t2] = float(tmp_rho)
 
+            #print "---"
+            #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
+
+    #正規化
+    #もし逆行列がとれない場合はどうするか?
+
+    def backSortM(self, X):
+        X = np.matrix(X)
+        rows, cols = X.shape
+        #s = np.matrix()
+        s = X[:,cols-1:cols]
+        #s = [[0 for i in range(rows)]]
+
+        for i in range(cols-1):
+            s = np.c_[s, X[:,cols-i-2:cols-i-1]]
+
+        return s
+
+    def backSort(self, X):
+        cols = len(X)
+        #s = np.matrix()
+        s = []
+        #s = [[0 for i in range(rows)]]
+
+        for i in range(cols):
+            s.append(X[cols-i-1])
+
+        return s
+
+
+    def dataNorm(self, X, Y):
+        print "mean"
+        print X.mean(axis=0)
+        print X
+
+        # zero mean
+        X = X - X.mean(axis=0)
+        Y = Y - Y.mean(axis=0)
+
+        print X
+
+        SXX = np.cov(X)
+        """
+        U, l, Ut = LA.svd(SXX, full_matrices=True) 
+        print "Sxx"
+        print SXX
+        print "xU"
+        print U
+        print "xl"
+        print l
+
+        print "xUt"
+        print Ut
+        print "Ut*U"
+        print np.dot(Ut,U)
+        print "l det:"+str(NLA.det(np.diag(l)))
+        """
+        l, U = LA.eigh(SXX)
+        print "xl"
+        print l
+        l = self.backSort(l)
+        U = self.backSortM(U)
+        print "xl"
+        print l
+        print "xl"
+        print np.diag(l)
+        print "U"
+        print U
+        print "Sxx"
+        print SXX
+        print "UlUt"
+        print np.dot(np.dot(U,np.diag(l)),U.T)
+
+        """
+        print "xU"
+        print U
+        #print "xl"
+        #l = l.sort()
+        print "sort U"
+        print self.backSort(U)
+        print "sort l"
+        print self.backSort(l)
+        print np.dot(np.dot(LA.sqrtm(LA.inv(np.diag(l))),np.diag(l)),LA.sqrtm(LA.inv(np.diag(l))))
+
+        print "x:Ut*U"
+        print np.dot(U.T,U)
+        """
+        print "inv l"
+        print LA.inv(np.diag(l))
+        H = np.dot(LA.sqrtm(LA.inv(np.diag(l))),U.T)
+        print X.mean(axis=0)
+        nX = np.dot(H, (X - X.mean(axis=0)))
+        
+        print "cov[X]"
+        print np.cov(nX)
+        #print "mean:"
+        #print np.mean(self.nX)
+
+        SYY = np.cov(Y)
+        l, U = LA.eigh(SYY)
+        l = self.backSort(l)
+        U = self.backSortM(U)
+
+        #print "y:Ut*U"
+        #print np.dot(U.T,U)
+
+        """
+        U, l, Ut = LA.svd(SYY, full_matrices=True) 
+        print "Syy"
+        print SYY
+        print "yU"
+        print U
+        print "yl"
+        print l
+        print "yUt"
+        print Ut
+        print "l det:"+str(NLA.det(np.diag(l)))
+        print "lambs"
+        print lambs
+        print "vecs"
+        print vecs
+        print np.dot(np.dot(vecs, np.diag(lambs)), vecs.T)
+        """
+        
+        H = np.dot(LA.sqrtm(LA.inv(np.diag(l))),U.T)
+        #print "H"
+        #print H
+        nY = np.dot(H, Y)
+        print "cov[Y]"
+        print np.cov(nY)
+        
+
+        
+        """
+        print "dataNorm_X:"
+        for i in range(len(self.nX)):
+            print(self.nX[i])
+        print("---")
+
+        print "dataNorm_Y:"
+        for i in range(len(self.nY)):
+            print(self.nY[i])
+        print("---")
+        """
+        return nX, nY
 
     #正準相関
     def canoniCorr(self, U1, U2):
@@ -300,8 +460,9 @@ class CCA(QtGui.QWidget):
         self.q, self.n = tY.shape
 
         #正規化
-        sX = sp.stats.zscore(tX, axis=1)
-        sY = sp.stats.zscore(tY, axis=1)
+        sX, sY = self.dataNorm(tX, tY)
+        #sX = sp.stats.zscore(tX, axis=1)
+        #sY = sp.stats.zscore(tY, axis=1)
 
         #共分散行列
         cov = np.cov(sX, sY)
@@ -309,38 +470,77 @@ class CCA(QtGui.QWidget):
         sxy = cov[:self.p,self.p:]
         syy = cov[self.p:,self.p:]
         a = np.dot(sxy, sxy.T)
-
+        #print a
         #固有値問題
         #eighは実対称行列のみ, 固有値・ベクトルは昇順(小→大)
         lambs, vecs = LA.eigh(a)
-        print "lam"
-        print np.sqrt(lambs)
-
-        #最大の固有値・ベクトルをとる
+        rho = 0
+        srho = 0
         vr, vc = vecs.shape
-        vec1 = vecs[:,vc-1:vc]
-        lamb = np.sqrt(lambs[vc-1])
-        vec2 = np.dot(sxy.T, vec1)/lamb
+
+        #print "vecs:"
+        #print vecs
+        #print "lambs:"
+        #print lambs
+        #print "sxx"
+        #print sxx
+        #Wx=vecs[:,vc-1:vc]
+        #print "WtSxxWt"
+        #print np.dot(np.dot(Wx.T,sxx),Wx)
+        #self.bartlettTest(vr, vc, lambs)
+
+        d = 1
         
-        v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
-        v1sxxv1 = np.dot(np.dot(vec1.T,sxx),vec1)
-        v2syyv2 = np.dot(np.dot(vec2.T,syy),vec2)
+        for i in range(d):
+            vec1 = vecs[:,vc-i-1:vc-i]
+            lamb = np.sqrt(lambs[vc-i-1])
+            vec2 = np.dot(sxy.T, vec1)/lamb
 
-        rho = v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
-        return rho
+            v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
+            v1sxxv1 = np.dot(np.dot(vec1.T,sxx),vec1)
+            v2syyv2 = np.dot(np.dot(vec2.T,syy),vec2)
 
-    """
-    def time_setting(self):
-        count = 0
-        self.timedata = []
-        for dt in range(-self.maxRange, self.maxRange+1):
-            if dt > 0:
-                self.timedata.append(self.time[abs(dt)]-self.time[0])
-            if dt <= 0:
-                self.timedata.append(self.time[0]-self.time[abs(dt)])
-                    
-    """
+            rho = v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
+            srho = srho + rho 
+           # print float(rho)
 
+        return float(srho)/d
+
+
+
+    def bartlettTest(self, rows, cols, lambs):
+        
+        lSize = len(lambs)
+        M = rows-1/2*(cols+cols+3)
+        #print lambs
+        for i in range(lSize):
+            #有意水準を求める
+            alf = 0.05
+            sig = sp.special.chdtri((cols-i+1)*(cols-i+1), alf)
+            w = 1
+            for j in range(i, lSize):
+                w = w*(1-lambs[lSize-j-1])
+                print "j:"+str(j)+", lam:"+str(lambs[lSize-j-1])+", w:"+str(w)
+            #print "w:"+str(w)
+            """
+            bart = M*math.log(w)
+            #print  "bart["+str(i)+"]:"+str(bart) +" > sig("+str(alf)+"):"+str(sig)
+        
+            if bart > sig:
+                print  "bart["+str(i)+"]:"+str(bart) +" > sig("+str(alf)+"):"+str(sig)
+                #ru = np.fabs(self.A[:,i:i+1])
+                #rv = np.fabs(self.B[:,i:i+1])
+                #ru = self.A[:,i:i+1]
+                #rv = self.B[:,i:i+1]
+                #print "ru-max val:"+str(np.max(ru))+", arg:"+str(np.argmax(ru))
+                #print "rv-max val:"+str(np.max(rv))+", arg:"+str(np.argmax(rv))
+                #print "ru-max arg:"+str(np.argmax(ru))
+                #print "rv-max arg:"+str(np.argmax(rv))
+                #print "---"
+            else:
+                break
+            """
+        #return 
 
 def main():
     app = QtGui.QApplication(sys.argv)

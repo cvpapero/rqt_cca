@@ -1,0 +1,84 @@
+#x1 <- c(2,5,7,9,8,4,2,6,3,6)
+#x2 <- c(3,4,6,8,5,3,3,5,4,7)
+#x3 <- c(4,6,8,8,7,2,3,7,5,8)
+#x4 <- c(3,3,5,9,6,5,4,7,4,6)
+
+x1 <- c(73,74,86,74,80,78,86,82,87,80)
+x2 <- c(57,59,63,59,60,59,61,59,64,59)
+x3 <- c(61,70,79,65,55,85,57,83,70,75)
+x4 <- c(48,48,52,48,42,58,48,52,52,52)
+
+
+x12 <- cor(scale(x1),scale(x2))
+x13 <- cor(scale(x1),scale(x3))
+x14 <- cor(scale(x1),scale(x4))
+x23 <- cor(scale(x2),scale(x3))
+x24 <- cor(scale(x2),scale(x4))
+x34 <- cor(scale(x3),scale(x4))
+
+r11 <- rbind(c(1,x12),c(x12,1))
+r12 <- rbind(c(x13,x14),c(x23,x24))
+r21 <- rbind(c(x13,x23),c(x14,x24))
+r22 <- rbind(c(1,x34),c(x34,1))
+
+#print(r11)
+#print(r12)
+#print(r21)
+#print(r22)
+
+#print(solve(r11))
+#print(solve(r22))
+
+ca <- solve(r11)%*%r12%*%solve(r22)%*%r21
+cat("ca")
+print(ca)
+
+z <- eigen(ca)
+cat("z")
+print(z)
+a <- ca[1,1]
+cat("a")
+print(a)
+b <- ca[1,2]
+cat("b")
+print(b)
+l <- z$values[1]
+cat("l")
+print(l)
+e <- r11[1,2]
+cat("e")
+print(e)
+
+t <- (b/(l-a))^2+(2*b*e)/(l-a)+1
+t2 <- sqrt(1/t)
+t1 <- b/(1-a)*t2 
+cat("t1")
+print(t1)
+cat("t2")
+print(t2)
+
+#f <- data.frame(x1, x2)
+#g <- data.frame(x3, x4)
+
+#f <- matrix(c(scale(x1), scale(x2)),,2)
+#g <- matrix(c(scale(x3), scale(x4)),,2)
+#print(f)
+#print(g)
+
+f <- matrix(c(x1, x2),,2)
+g <- matrix(c(x3, x4),,2)
+
+can <- cancor(f,g)
+print(can)
+
+cat("t2/t1")
+print(t2/t1)
+cat("z2/z1")
+print(z$vectors[2,1]/z$vectors[1,1])
+cat("c2/c1")
+print(can$xcoef[2,1]/can$xcoef[1,1])
+#print(can$xcoef[2,1])
+#print(can$xcoef[1,1])
+#b <- z$values[,1]*solve(r22)%*%r21
+
+#print(b) 
