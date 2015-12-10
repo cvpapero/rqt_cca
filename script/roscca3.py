@@ -367,19 +367,32 @@ class CCA(QtGui.QWidget):
         #Lxx = NLA.cholesky(Sxx)
         A =  np.dot(np.dot(np.dot(np.dot(NLA.inv(Lxx),Sxy),NLA.inv(Syy)),Sxy.T),NLA.inv(Lxx.T))
         #固有値問題
-        lambs, vecs = SLA.eig(A)
+        lambs, vecs = NLA.eig(A)
 
         #print "vecs:"
         #print vecs
-        #print "lambs:"
-        #print lambs
+        print "lambs:"
+        print lambs
         
+        """
         for (i, l) in enumerate(lambs):
             if l.imag == 0 and l.real < 1 and 0 < l.real:
-                print "lambs["+str(i)+"]:"+str(l)
-                
-        
+                print "lambs["+str(i)+"]:"+str(l)                
+        """
+
         Wx = np.dot(NLA.inv(Lxx.T),vecs)
+
+        #lst = [[1, 2, 3] for i in range(3)]
+        #print(lst)
+        # => [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
+
+        #L = [[1/np.sqrt(lambs[i].real) for i in range(len(lambs))] for j in range(len(lambs))]
+        #L = [1/lambs for i in range(len(lambs))]
+        #L = np.matrix(L).T
+        #print "L"
+        #print L
+        Wy = (np.dot(np.dot(NLA.inv(Syy),Sxy.T),Wx))/np.sqrt(lambs[0].real)
+        #Wy = np.dot(L, np.dot(np.dot(NLA.inv(Syy),Sxy.T),Wx))
         #print "Wx"
         #print Wx
         rho = 0
@@ -399,17 +412,18 @@ class CCA(QtGui.QWidget):
         #d = self.bartlettTest(vr, vc, lambs)
         srho = 0
         
-        d = 6
+        d = 1
         
         for i in range(d):
-            #vec1 = vecs[:,vc-i-1:vc-i]
-            #lamb = np.sqrt(lambs[vc-i-1])
-            #vec2 = np.dot(sxy.T, vec1)/lamb
+            vec1 = Wx[:,i:i+1]
+            lamb = np.sqrt(lambs[i].real)
+            vec2 = Wy[:,i:i+1]
 
             #v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
-            #v1sxxv1 = np.dot(np.dot(vec1.T,sxx),vec1)
-            #v2syyv2 = np.dot(np.dot(vec2.T,syy),vec2)
-
+            v1sxxv1 = np.dot(np.dot(vec1.T,Sxx),vec1)
+            v2syyv2 = np.dot(np.dot(vec2.T,Syy),vec2)
+            #print "v1sxxv1:"+str(v1sxxv1)
+            #print "v2syyv2:"+str(v2syyv2)
             rho = np.sqrt(lambs[i].real)#v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
             srho = srho + rho 
            # print float(rho)
