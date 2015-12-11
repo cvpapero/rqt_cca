@@ -309,213 +309,103 @@ class CCA(QtGui.QWidget):
             #print "---"
             #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
 
-    #正規化
-    #もし逆行列がとれない場合はどうするか?
+
+    #逆順に並べ替え(matrix)
     def backSortM(self, X):
         X = np.matrix(X)
         rows, cols = X.shape
-        #s = np.matrix()
         s = X[:,cols-1:cols]
-        #s = [[0 for i in range(rows)]]
-
         for i in range(cols-1):
             s = np.c_[s, X[:,cols-i-2:cols-i-1]]
-
         return s
 
+    #array
     def backSort(self, X):
         cols = len(X)
-        #s = np.matrix()
         s = []
-        #s = [[0 for i in range(rows)]]
-
         for i in range(cols):
             s.append(X[cols-i-1])
-
         return s
 
-    def stdNorm(self, U1, U2):
-        print "U1"
-        print U1
-        print "U2"
-        print U2
+    #正規化
+    def stdNorm(self, U):
 
-        mat1 = np.matrix(U1).T
-        print mat1
-        print mat1.mean(axis=1)
-        mat1 = mat1 - mat1.mean(axis=1)
-        print mat1
-        mat1cov = np.cov(mat1)
-        print mat1cov
-        p1,l1,p1t = NLA.svd(mat1cov)
-        print p1
-        print l1
-        print p1t
-        l1sq = SLA.sqrtm(SLA.inv(np.diag(l1))) 
-        snU1 =  np.dot(np.dot(l1sq, p1.T), mat1)
+        mat = np.matrix(U).T
+        mat = mat - mat.mean(axis=1)
+        mcov = np.cov(mat)
+        p,l,pt = NLA.svd(mcov)
+        lsi = SLA.sqrtm(SLA.inv(np.diag(l))) 
+        snU =  np.dot(np.dot(lsi, p.T), mat)
 
-        mat2 = np.matrix(U2).T
-        mat2 = mat2 - mat2.mean(axis=1)
-        mat2cov = np.cov(mat2)
-        p2,l2,p2t = NLA.svd(mat2cov)
-        l2sq = SLA.sqrtm(SLA.inv(np.diag(l2))) 
-        snU2 =  np.dot(np.dot(l2sq, p2.T), mat2)
+        #print "cov:"
+        #print np.cov(snU)
 
-        print "cov:"
-        print np.cov(snU1)
-        print np.cov(snU2)
-
-        return snU1, snU2
+        return snU
 
     #正準相関
     def canoniCorr(self, U1, U2):
-        #print "data U1 U2"
-        #print U1
-        #print U2
-        U1, U2 = self.stdNorm(U1, U2)
 
-        #sX = np.matrix(U1).T
-        #sY = np.matrix(U2).T
+        #ave=0, Sxx=I
+        U1 = self.stdNorm(U1)
+        U2 = self.stdNorm(U2)
 
         data = np.r_[U1, U2]
-        #data.extend(U1)
-        #data.extend(U2)
-
-        #print "data"
-        #print data
-        
         p,n = U1.shape
-
-        #print "r:"+str(r)+", c:"+str(c)
-
-        #sX = tX - tX.mean(axis=0)
-        #sY = tY - tY.mean(axis=0)
-
+        q,n = U2.shape
         S = np.cov(data)
-
-        #べつにこのやり方は間違ってない
-        #S2 = np.cov(sX, sY)
 
         Sxx = S[:p,:p]
         Sxy = S[:p,p:]
         Syy = S[p:,p:]
-        
-        #print "S-S2"
-        #print S-S2
-        #print "S2"
-        #print S2
 
-        #print "Sxx"
-        #print Sxx
-        slambs = NLA.eigvalsh(Sxx)
-        #lambs, vecs = SLA.eig(Sxx)
-        #print "sxx lam"
-        #print slambs
-        #Lxx = SLA.cholesky(Sxx, lower=True)
-        #Lxx = NLA.cholesky(Sxx)
-        #A =  np.dot(np.dot(np.dot(np.dot(NLA.inv(Lxx),Sxy),NLA.inv(Syy)),Sxy.T),NLA.inv(Lxx.T))
-        #print A
+        A = np.dot(Sxy, Sxy.T)
         #固有値問題
-        lambs, vecs = SLA.eigh(np.dot(Sxy, Sxy.T))
+        lambs, Wx = SLA.eigh(A)
 
-        #print "vecs:"
-        #print vecs
+        #値を丸めるなら
+        #lambs = [round(elem,10) for elem in lambs]
+
+        lambs = self.backSort(np.sqrt(lambs))
+        Wx = self.backSortM(Wx)
+        Wy = np.dot(np.dot(Sxy.T, Wx), SLA.inv(np.diag(lambs)))
+
         print "lambs:"
         print lambs
-        
-        """
-        for (i, l) in enumerate(lambs):
-            if l.imag == 0 and l.real < 1 and 0 < l.real:
-                print "lambs["+str(i)+"]:"+str(l)                
-        """
-
-        Wx = np.dot(NLA.inv(Lxx.T),vecs)
-
-        #lst = [[1, 2, 3] for i in range(3)]
-        #print(lst)
-        # => [[1, 2, 3], [1, 2, 3], [1, 2, 3]]
-
-        #L = [[1/np.sqrt(lambs[i].real) for i in range(len(lambs))] for j in range(len(lambs))]
-        #L = [1/lambs for i in range(len(lambs))]
-        #L = np.matrix(L).T
-        #print "L"
-        #print L
-        Wy = (np.dot(np.dot(NLA.inv(Syy),Sxy.T),Wx))/np.sqrt(lambs[0].real)
-        #Wy = np.dot(L, np.dot(np.dot(NLA.inv(Syy),Sxy.T),Wx))
-        #print "Wx"
+        #print "Wx:"
         #print Wx
-        rho = 0
-        srho = 0
-        vr, vc = vecs.shape
-        
-        #print "vecs:"
-        #print vecs
-        #print "lambs:"
-        #print lambs
-        #print "sxx"
-        #print sxx
-        #Wx=vecs[:,vc-1:vc]
-        #print "WtSxxWt"
-        #print np.dot(np.dot(Wx.T,sxx),Wx)
+        #print "Wy:"
+        #print Wy
 
-        #d = self.bartlettTest(vr, vc, lambs)
-        srho = 0
-        
-        d = 1
-        
-        """
-        for i in range(d):
-            vec1 = Wx[:,vc-i-1:vc-i]
-            lamb = np.sqrt(lambs[vc-i-1])
-            vec2 = Wy[:,i:i+1]
+        #d = self.bartlettTest(p, q, lambs)
 
-            #v1sxyv2 = np.dot(np.dot(vec1.T,sxy),vec2)
-            v1sxxv1 = np.dot(np.dot(vec1.T,Sxx),vec1)
-            v2syyv2 = np.dot(np.dot(vec2.T,Syy),vec2)
-            #print "v1sxxv1:"+str(v1sxxv1)
-            #print "v2syyv2:"+str(v2syyv2)
-            rho = lambs#np.sqrt(lambs[i].real)#v1sxyv2 / np.sqrt(np.dot(v1sxxv1,v2syyv2))
-            srho = srho + rho 
-           # print float(rho)
-        """
-        return np.sqrt(lambs[vc-1])
-        #return float(srho)/d
+        return lambs[0]
 
 
 
     def bartlettTest(self, rows, cols, lambs):
-        
         lSize = len(lambs)
         M = rows-1/2*(cols+cols+3)
-        #print lambs
+
         for i in range(lSize):
             #有意水準を求める
             alf = 0.05
             sig = sp.special.chdtri((cols-i+1)*(cols-i+1), alf)
             w = 1
             for j in range(i, lSize):
-                w = w*(1-lambs[lSize-j-1].real)
-                print "j:"+str(j)+", lam:"+str(lambs[lSize-j-1])+", w:"+str(w)
-            #print "w:"+str(w)
+                w = w*(1-lambs[lSize-j-1])
+                #print "j:"+str(j)+", lam:"+str(lambs[lSize-j-1])+", w:"+str(w)
+            print "w:"+str(w)
             
             bart = M*math.log(w)
             #print  "bart["+str(i)+"]:"+str(bart) +" > sig("+str(alf)+"):"+str(sig)
         
             if bart > sig:
                 print  "bart["+str(i)+"]:"+str(bart) +" > sig("+str(alf)+"):"+str(sig)
-                #ru = np.fabs(self.A[:,i:i+1])
-                #rv = np.fabs(self.B[:,i:i+1])
-                #ru = self.A[:,i:i+1]
-                #rv = self.B[:,i:i+1]
-                #print "ru-max val:"+str(np.max(ru))+", arg:"+str(np.argmax(ru))
-                #print "rv-max val:"+str(np.max(rv))+", arg:"+str(np.argmax(rv))
-                #print "ru-max arg:"+str(np.argmax(ru))
-                #print "rv-max arg:"+str(np.argmax(rv))
-                #print "---"
             else:
                 break
         print "i:"+str(i)
-        return 1
+
+        return i
 
 def main():
     app = QtGui.QApplication(sys.argv)
