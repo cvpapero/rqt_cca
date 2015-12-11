@@ -3,25 +3,18 @@
 
 #一定フレーム内同士で計算する
 #それ以外では計算しない(たぶん、関連が無いから)
-#バートレット検定で第何位までの成分を使うか決める
-
-#import sys
-#import math
-#import json
-#import numpy
+#バートレット検定で第何位までの成分を使うか決める(未)
+#ave=0, Sxx=Iを実装(2015.12.11)
 
 import sys
 import os.path
 import math
 import json
+
 import numpy as np
 from numpy import linalg as NLA
-
-#import pyper
-
 import scipy as sp
 from scipy import linalg as SLA
-from scipy import stats as ST
 
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
@@ -43,15 +36,12 @@ class CCA(QtGui.QWidget):
         #UIの初期化
         self.initUI()
 
-        #ファイル入力
-        #self.jsonInput()
-
         #ROSのパブリッシャなどの初期化
         rospy.init_node('roscca', anonymous=True)
         self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
         self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
 
-
+        #rvizのカラー設定(未)
         self.carray = []
         clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
         for c in clist:
@@ -76,7 +66,6 @@ class CCA(QtGui.QWidget):
         boxSepFile.addWidget(btnSepFile)
         form.addRow('input file', boxSepFile)
         
-
         #window size
         self.winSizeBox = QtGui.QLineEdit()
         self.winSizeBox.setText('5')
@@ -160,10 +149,7 @@ class CCA(QtGui.QWidget):
 
 
     def jsonInput(self):
-        #filename = QtGui.QFileDialog.getOpenFileName(self, 'Open file', os.path.expanduser('~') + '/Desktop')
         filename = self.txtSepFile.text()
-
-        #f = open('test1014.json', 'r')
         f = open(filename, 'r')
         jsonData = json.load(f)
         #print json.dumps(jsonData, sort_keys = True, indent = 4)
@@ -188,11 +174,11 @@ class CCA(QtGui.QWidget):
         print self.DATAS[1]
         """
 
-
     def doExec(self):
 
         print "exec!"
 
+        #ファイル入力
         self.jsonInput()
 
         self.winSize = int(self.winSizeBox.text())
@@ -233,6 +219,7 @@ class CCA(QtGui.QWidget):
             iItem = QtGui.QTableWidgetItem(str(i))
             self.table.setVerticalHeaderItem(i, iItem)
             self.table.verticalHeaderItem(i).setToolTip(str(i))
+            #時間軸にデータを入れるなら↓
             #self.table.verticalHeaderItem(i).setToolTip(str(self.timedata[i]))
             for j in range(len(self.ccaMat[i])):
 
@@ -319,7 +306,7 @@ class CCA(QtGui.QWidget):
             s = np.c_[s, X[:,cols-i-2:cols-i-1]]
         return s
 
-    #array
+    #逆順に並べ替(array)
     def backSort(self, X):
         cols = len(X)
         s = []
