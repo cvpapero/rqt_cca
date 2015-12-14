@@ -5,8 +5,9 @@
 #それ以外では計算しない(たぶん、関連が無いから)
 #バートレット検定で第何位までの成分を使うか決める(未)
 #ave=0, Sxx=Iを実装(2015.12.11)
+
 #写像して(U1*Wx,U2*W2)相関をとったけど、やはり1になる。検算としては間違ってないかと思われる
-#では、動いていない関節が強調されているのでは無いか？調べてみる
+#では、動いていない関節が強調されているのでは無いか？調べてみる(2015.12.14)
 
 import sys
 import os.path
@@ -21,6 +22,8 @@ from scipy import linalg as SLA
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
+
+from pylab import *
 
 import rospy
 from visualization_msgs.msg import MarkerArray
@@ -163,7 +166,7 @@ class CCA(QtGui.QWidget):
             #angle
             data = []
             self.datasSize = len(user["datas"])
-
+            self.dataDimen = len(user["datas"][0]["data"])
             for j in range(self.datasSize):
                 data.append(user["datas"][j]["data"])
 
@@ -255,6 +258,10 @@ class CCA(QtGui.QWidget):
         print "frameRange:"+str(self.frameRange)
         print "dataRange:"+str(self.dataRange)
 
+        #最大ベクトルのカウント
+        self.mWxList = np.zeros([self.dataDimen, self.dataDimen])
+        self.mWyList = np.zeros([self.dataDimen, self.dataDimen])
+
         for f in range(self.frameRange):
             print "f:"+str(f)+"---"
             if f == 0:
@@ -295,8 +302,36 @@ class CCA(QtGui.QWidget):
                     tmp_rho = self.canoniCorr(USER1, USER2)
                     self.ccaMat[f+self.dataRange-1][f+t2] = float(tmp_rho)
 
-            #print "---"
-            #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
+        """
+        for i in range(len(self.mWxList)):
+            print str(i)+": "+str(self.mWxList[i])
+        print "---"
+        for i in range(len(self.mWyList)):
+            print str(i)+": "+str(self.mWyList[i])
+        """
+        print "mwx:"
+        print self.mWxList
+        print "mwy:"
+        print self.mWyList
+
+        x = arange(self.dataDimen+1)
+        y = arange(self.dataDimen+1)
+
+        X, Y = meshgrid(x, y)
+        subplot(1,2,1)
+        pcolor(X, Y, self.mWxList)
+        colorbar()
+        title("user 1")
+
+        subplot(1,2,2)
+        pcolor(X, Y, self.mWyList)
+        colorbar()
+        title("user 2")
+        tight_layout()
+
+        show()
+
+        #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
 
 
     #逆順に並べ替え(matrix)
@@ -331,6 +366,9 @@ class CCA(QtGui.QWidget):
 
         return snU
 
+    def maxIdx(self, U):
+        pass
+
     """
     正準相関
     U1, U2はn*p行列, n*q行列(nは二群で同値)
@@ -356,22 +394,45 @@ class CCA(QtGui.QWidget):
 
         A = np.dot(Sxy, Sxy.T)
         #固有値問題
-        lambs, Wx = SLA.eigh(A)
+        #lambs, Wx = SLA.eigh(A)
+        lambs, Wx = NLA.eig(A)
 
 
 
         lambs = self.backSort(np.sqrt(lambs))
         Wx = self.backSortM(Wx)
+        #lambs = np.sqrt(lambs)
         Wy = np.dot(np.dot(Sxy.T, Wx), SLA.inv(np.diag(lambs)))
-
+        print "lambs:"
+        print lambs
         #値を丸めるなら
         #lambs = [round(elem,10) for elem in lambs]
         
+        #wwx = np.fabs(Wx[:,0:1])
+        #wwy = np.fabs(Wy[:,0:1])
+        #maxWxIdx = max(enumerate(wwx), key=lambda x:x[1])[0]
+        #maxWyIdx = max(enumerate(wwy), key=lambda x:x[1])[0]
+        #print "maxWxIdx:"
+        #print maxWxIdx
+        #print "maxWyIdx:"
+        #print maxWyIdx
+        #print Wx[:,0:1]
+        #print Wx[:,0:1].shape
+        self.mWxList += np.fabs(Wx)
+        self.mWyList += np.fabs(Wy)
+
+        """
+        print "wwx:"
+        print wwx
+        print "wwy:"
+        print wwy
+        """
+
+        """
         print "U1:"
         print U1
         print "U2:"
-        print U2
-        
+        print U2   
         print "lambs:"
         print lambs
         print "Wx:"
@@ -385,17 +446,14 @@ class CCA(QtGui.QWidget):
         #fU2 = np.dot(U2.T, Wy[:,0:1]).T
         fU1 = np.dot(U1.T, Wx).T
         fU2 = np.dot(U2.T, Wy).T
-
         print "fU1:"
         print fU1
         print "fU2:"
         print fU2
-
         data_t = np.r_[fU1, fU2]
-
         print "cov:"
         print np.cov(data_t)
-
+        """
         return lambs[0]
 
 
