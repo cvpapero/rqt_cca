@@ -73,14 +73,14 @@ class CCA(QtGui.QWidget):
         
         #window size
         self.winSizeBox = QtGui.QLineEdit()
-        self.winSizeBox.setText('5')
+        self.winSizeBox.setText('40')
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('7')
+        self.frmSizeBox.setText('50')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -193,7 +193,26 @@ class CCA(QtGui.QWidget):
         self.canoniExec1()
         #self.time_setting()
         self.updateTable()
+        self.updateColorTable()
         print "end"
+
+    def updateColorTable(self):
+        x = arange(self.dataDimen+1)
+        y = arange(self.dataDimen+1)
+
+        X, Y = meshgrid(x, y)
+        subplot(1,2,1)
+        pcolor(X, Y, self.mWxList)
+        colorbar()
+        title("user 1")
+
+        subplot(1,2,2)
+        pcolor(X, Y, self.mWyList)
+        colorbar()
+        title("user 2")
+        tight_layout()
+
+        show()   
 
     def updateTable(self):
         
@@ -244,6 +263,8 @@ class CCA(QtGui.QWidget):
         
         self.table.resizeRowsToContents()
         self.table.resizeColumnsToContents()
+
+
 
     def canoniExec1(self):
 
@@ -314,22 +335,7 @@ class CCA(QtGui.QWidget):
         print "mwy:"
         print self.mWyList
 
-        x = arange(self.dataDimen+1)
-        y = arange(self.dataDimen+1)
 
-        X, Y = meshgrid(x, y)
-        subplot(1,2,1)
-        pcolor(X, Y, self.mWxList)
-        colorbar()
-        title("user 1")
-
-        subplot(1,2,2)
-        pcolor(X, Y, self.mWyList)
-        colorbar()
-        title("user 2")
-        tight_layout()
-
-        show()
 
         #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
 
@@ -399,14 +405,16 @@ class CCA(QtGui.QWidget):
 
 
 
-        lambs = self.backSort(np.sqrt(lambs))
-        Wx = self.backSortM(Wx)
+        #lambs = self.backSort(np.sqrt(lambs))
+        idx = lambs.argsort()[::-1]
+        lambs = np.sqrt(lambs[idx])
+        Wx=Wx[:,idx]
+
         #lambs = np.sqrt(lambs)
         Wy = np.dot(np.dot(Sxy.T, Wx), SLA.inv(np.diag(lambs)))
         print "lambs:"
         print lambs
-        #値を丸めるなら
-        #lambs = [round(elem,10) for elem in lambs]
+
         
         #wwx = np.fabs(Wx[:,0:1])
         #wwy = np.fabs(Wy[:,0:1])
@@ -418,8 +426,8 @@ class CCA(QtGui.QWidget):
         #print maxWyIdx
         #print Wx[:,0:1]
         #print Wx[:,0:1].shape
-        self.mWxList += np.fabs(Wx)
-        self.mWyList += np.fabs(Wy)
+        self.mWxList += np.dot(np.fabs(Wx),np.diag(lambs))
+        self.mWyList += np.dot(np.fabs(Wy),np.diag(lambs))
 
         """
         print "wwx:"
