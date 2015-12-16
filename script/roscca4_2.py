@@ -9,6 +9,9 @@
 #写像して(U1*Wx,U2*W2)相関をとったけど、やはり1になる。検算としては間違ってないかと思われる
 #では、動いていない関節が強調されているのでは無いか？調べてみる(2015.12.14)
 
+#ベクトルの足し算
+#固有値固有ベクトルの大きい順に並べ替え(2015.12.15)
+
 import sys
 import os.path
 import math
@@ -23,7 +26,8 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
 
-from pylab import *
+#from pylab import *
+import pylab as pl
 
 import rospy
 from visualization_msgs.msg import MarkerArray
@@ -80,7 +84,7 @@ class CCA(QtGui.QWidget):
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('50')
+        self.frmSizeBox.setText('40')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -121,10 +125,9 @@ class CCA(QtGui.QWidget):
         jItem = QtGui.QTableWidgetItem(str(0))
         self.table.setHorizontalHeaderItem(0, jItem)
 
-
         #アイテムがクリックされたらパブリッシュする
-        #self.table.itemClicked.connect(self.doViz)
-        #self.table.setItem(0, 0, QtGui.QTableWidgetItem(1))
+        self.table.itemClicked.connect(self.updateColorTable)
+        self.table.setItem(0, 0, QtGui.QTableWidgetItem(1))
 
         boxTable = QtGui.QHBoxLayout()
         boxTable.addWidget(self.table)
@@ -140,6 +143,8 @@ class CCA(QtGui.QWidget):
 
         self.setWindowTitle("cca window")
         self.show()
+        
+        #self.initColorTable()
 
 
     def chooseDbFile(self):
@@ -197,22 +202,28 @@ class CCA(QtGui.QWidget):
         print "end"
 
     def updateColorTable(self):
-        x = arange(self.dataDimen+1)
-        y = arange(self.dataDimen+1)
+        print "now viz!"+str(cItem.row())+","+str(cItem.column())
 
-        X, Y = meshgrid(x, y)
-        subplot(1,2,1)
-        pcolor(X, Y, self.mWxList)
-        colorbar()
-        title("user 1")
+        pl.clf()
+        #pl.ion()
+        x = pl.arange(self.dataDimen+1)
+        y = pl.arange(self.dataDimen+1)
+        X, Y = pl.meshgrid(x, y)
+        pl.subplot(1,2,1)
+        pmap1 = pl.pcolor(X, Y, self.mWxList)
+        pl.gca().set_aspect('equal')
+        pl.colorbar(mappable=pmap1)
+        pl.title("user 1")
 
-        subplot(1,2,2)
-        pcolor(X, Y, self.mWyList)
-        colorbar()
-        title("user 2")
-        tight_layout()
+        pl.subplot(1,2,2)
+        pmap2 = pl.pcolor(X, Y, self.mWyList)
+        pl.gca().set_aspect('equal')
+        pl.colorbar(mappable=pmap2)
+        pl.title("user 2")
+        #pl.tight_layout()
 
-        show()   
+        pl.draw()
+        pl.show(block=False) 
 
     def updateTable(self):
         
@@ -246,13 +257,13 @@ class CCA(QtGui.QWidget):
             #時間軸にデータを入れるなら↓
             #self.table.verticalHeaderItem(i).setToolTip(str(self.timedata[i]))
             for j in range(len(self.ccaMat[i])):
-
+                
                 if hor == True:
                     jItem = QtGui.QTableWidgetItem(str(j))
                     self.table.setHorizontalHeaderItem(j, jItem)
                     self.table.horizontalHeaderItem(j).setToolTip(str(j))
                     hot = False
-                    
+                
                 c = 0
                 if self.ccaMat[i][j] > self.threshold:
                     c = self.ccaMat[i][j]*255
@@ -260,10 +271,10 @@ class CCA(QtGui.QWidget):
                 self.table.setItem(i, j, QtGui.QTableWidgetItem())
                 self.table.item(i, j).setBackground(QtGui.QColor(c,c,c))
                 self.table.item(i, j).setToolTip(str(self.ccaMat[i][j]))
-        
+        self.table.setVisible(False)
         self.table.resizeRowsToContents()
         self.table.resizeColumnsToContents()
-
+        self.table.setVisible(True)
 
 
     def canoniExec1(self):
@@ -283,8 +294,10 @@ class CCA(QtGui.QWidget):
         self.mWxList = np.zeros([self.dataDimen, self.dataDimen])
         self.mWyList = np.zeros([self.dataDimen, self.dataDimen])
 
+        self.output = 1
+
         for f in range(self.frameRange):
-            print "f:"+str(f)+"---"
+            #print "f:"+str(f)+"---"
             if f == 0:
                 for t1 in range(self.dataRange):
                     rho = 0
@@ -323,39 +336,15 @@ class CCA(QtGui.QWidget):
                     tmp_rho = self.canoniCorr(USER1, USER2)
                     self.ccaMat[f+self.dataRange-1][f+t2] = float(tmp_rho)
 
-        """
-        for i in range(len(self.mWxList)):
-            print str(i)+": "+str(self.mWxList[i])
-        print "---"
-        for i in range(len(self.mWyList)):
-            print str(i)+": "+str(self.mWyList[i])
-        """
-        print "mwx:"
-        print self.mWxList
-        print "mwy:"
-        print self.mWyList
+
+        #print "mwx:"
+        #print self.mWxList
+        #print "mwy:"
+        #print self.mWyList
 
 
 
         #print "user1 t:"+str(time1)+", user2 t:"+str(time2)+", delay(t1-t2):"+str(time1-time2)+", rho:"+str(float(rho))
-
-
-    #逆順に並べ替え(matrix)
-    def backSortM(self, X):
-        X = np.matrix(X)
-        rows, cols = X.shape
-        s = X[:,cols-1:cols]
-        for i in range(cols-1):
-            s = np.c_[s, X[:,cols-i-2:cols-i-1]]
-        return s
-
-    #逆順に並べ替(array)
-    def backSort(self, X):
-        cols = len(X)
-        s = []
-        for i in range(cols):
-            s.append(X[cols-i-1])
-        return s
 
     #正規化
     def stdNorm(self, U):
@@ -386,12 +375,12 @@ class CCA(QtGui.QWidget):
     def canoniCorr(self, U1, U2):
 
         #ave=0, Sxx=I
-        U1 = self.stdNorm(U1)
-        U2 = self.stdNorm(U2)
+        nU1 = self.stdNorm(U1)
+        nU2 = self.stdNorm(U2)
 
-        data = np.r_[U1, U2]
-        p,n = U1.shape
-        q,n = U2.shape
+        data = np.r_[nU1, nU2]
+        p,n = nU1.shape
+        q,n = nU2.shape
         S = np.cov(data)
 
         Sxx = S[:p,:p]
@@ -403,17 +392,13 @@ class CCA(QtGui.QWidget):
         #lambs, Wx = SLA.eigh(A)
         lambs, Wx = NLA.eig(A)
 
-
-
-        #lambs = self.backSort(np.sqrt(lambs))
         idx = lambs.argsort()[::-1]
         lambs = np.sqrt(lambs[idx])
         Wx=Wx[:,idx]
 
-        #lambs = np.sqrt(lambs)
         Wy = np.dot(np.dot(Sxy.T, Wx), SLA.inv(np.diag(lambs)))
-        print "lambs:"
-        print lambs
+        #print "lambs:"
+        #print lambs
 
         
         #wwx = np.fabs(Wx[:,0:1])
@@ -436,18 +421,49 @@ class CCA(QtGui.QWidget):
         print wwy
         """
 
-        """
-        print "U1:"
-        print U1
-        print "U2:"
-        print U2   
-        print "lambs:"
-        print lambs
-        print "Wx:"
-        print Wx
-        print "Wy:"
-        print Wy
+        if self.output == 1:
+            f = open('outcca','w')
+            #string = "U1:\n"+str(U1)+"\n U2:\n"+str(U2)+"\n nU1:\n"+str(nU1)+"\n nU2:\n"+str(nU2)
+            #string2 = "lambs:\n"+str(lambs)
+            #print "Wx:"
+            #print Wx
+            #print "Wy:"
+            #print Wy
+            for i, u in enumerate(U1):
+                out = "x"+str(i)+"<-c(" 
+                for j, el in enumerate(u):
+                    if j != len(u)-1:
+                        out += str(el)+", "
+                    else:
+                        out += str(el)+")"
+                f.write(out+"\n")
 
+            for i, u in enumerate(U2):
+                out = "y"+str(i)+"<-c(" 
+                for j, el in enumerate(u):
+                    if j != len(u)-1:
+                        out += str(el)+", "
+                    else:
+                        out += str(el)+")"
+                f.write(out+"\n")
+            """
+            f.write("U2:"+str(U2)+"\n")
+            f.write("nU1:"+str(nU1)+"\n")
+            f.write("nU2:"+str(nU2)+"\n")
+            f.write("lambs:"+str(lambs))
+            f.write("Wx:"+str(Wx))
+            f.write("Wy:"+str(Wy))
+            """
+            f.close()
+            print "lambs:"
+            print lambs
+            print "Wx:"
+            print Wx
+            print "Wy:"
+            print Wy
+            self.output = 0
+
+        """
         #d = self.bartlettTest(p, q, lambs)
 
         #fU1 = np.dot(U1.T, Wx[:,0:1]).T
