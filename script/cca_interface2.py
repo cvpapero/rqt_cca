@@ -104,18 +104,20 @@ class CCA(QtGui.QWidget):
         boxUpDate.addWidget(btnUpDate)
         form.addRow('corr theshold', boxUpDate)
 
+        """
         self.AnimeDelayBox =  QtGui.QLineEdit()
         self.AnimeDelayBox.setText('0')
         self.AnimeDelayBox.setAlignment(QtCore.Qt.AlignRight)
         self.AnimeDelayBox.setFixedWidth(100)
 
-        btnAnime =  QtGui.QPushButton('animetion')
+        btnAnime =  QtGui.QPushButton('create')
         btnAnime.setMaximumWidth(100)
         btnAnime.clicked.connect(self.animetionTable)
         boxAnime = QtGui.QHBoxLayout()
         boxAnime.addWidget(self.AnimeDelayBox)
         boxAnime.addWidget(btnAnime)
-        form.addRow('animetion', boxAnime)
+        form.addRow('delay', boxAnime)
+        """
 
         #exec
         boxCtrl = QtGui.QHBoxLayout()
@@ -139,7 +141,7 @@ class CCA(QtGui.QWidget):
         jItem = QtGui.QTableWidgetItem(str(0))
         self.table.setHorizontalHeaderItem(0, jItem)
 
-        #アイテムがクリックされたらパブリッシュする
+        #アイテムがクリックされたらグラフを更新
         self.table.itemClicked.connect(self.updateColorTable)
         self.table.setItem(0, 0, QtGui.QTableWidgetItem(1))
 
@@ -215,6 +217,25 @@ class CCA(QtGui.QWidget):
 
         self.DATAS = datas
 
+
+    def cutDatas(self):
+        
+        th = 250
+        
+        if self.datasSize > th:
+            datas = []
+            for data in self.DATAS:
+                uses = []
+                for i,d in enumerate(data):
+                    if i < th:
+                        uses.append(d)
+                    else:
+                        break
+                datas.append(uses)
+            self.DATAS = datas
+            #print "datas:"+str(datas)
+            self.datasSize = len(self.DATAS[0])
+
     def doExec(self):
 
         print "exec!"
@@ -225,6 +246,9 @@ class CCA(QtGui.QWidget):
         #使用する関節角度を選択
         self.selectJoints()
 
+        #大きすぎるデータの場合カットする
+        self.cutDatas()
+
         self.winSize = int(self.winSizeBox.text())
         self.frmSize = int(self.frmSizeBox.text())
 
@@ -234,6 +258,7 @@ class CCA(QtGui.QWidget):
         #self.updateColorTable()
         print "end"
 
+    """
     def animetionTable(self):
         delay = int(self.AnimeDelayBox.text())
         
@@ -276,7 +301,7 @@ class CCA(QtGui.QWidget):
         
         #pl.show()
         #pl.show(block=False) 
-        
+    """
 
 
     def updateColorTable(self, cItem):
