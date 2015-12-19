@@ -37,6 +37,90 @@ from geometry_msgs.msg import Point
 from geometry_msgs.msg import PointStamped
 from std_msgs.msg import ColorRGBA
 
+
+class GRAPH(QtGui.QWidget):
+    def __init__(self):
+        super(GRAPH, self).__init__()
+
+        print CCA().test
+
+
+    def drawPlot(self, row, col, mWx, mWy, ccaMat, DATAS, dataMaxRange, dataDimen, winSize):
+        #def drawPlot(self, row, col):
+        print "draw:"+str(row)+", "+str(col)
+
+        #pl.clf()
+        pl.ion()
+
+        Wx = mWx[row*dataMaxRange+col]
+        Wy = mWy[row*dataMaxRange+col]
+
+        x = pl.arange(dataDimen+1)
+        y = pl.arange(dataDimen+1)
+        X, Y = pl.meshgrid(x, y)
+        
+        pl.subplot2grid((2,2),(0,0))
+        pl.pcolor(X, Y, Wx)
+        pl.gca().set_aspect('equal')
+        pl.colorbar()
+        pl.gray()
+        pl.title("user 1:"+str(row))
+
+        pl.subplot2grid((2,2),(0,1))
+        pl.pcolor(X, Y, Wy)
+        pl.gca().set_aspect('equal')
+        pl.colorbar()
+        pl.gray()
+        pl.title("user 2:"+str(col))
+        #pl.tight_layout()
+        
+
+        #データの取得
+        U1 = []
+        U2 = []
+
+        for w in range(winSize):
+            U1.append(DATAS[0][row+w])
+            U2.append(DATAS[1][col+w])
+
+        nU1 = CCA().stdNorm(U1)
+        nU2 = CCA().stdNorm(U2)
+        x = np.linspace(0, winSize-1, winSize)
+
+        #forで回して第三位の正準相関までとる？
+        pl.subplot2grid((2,2),(1,0),colspan=2)
+        ls = ["-","--","-."]
+        order = 3
+        for i in range(order):
+            fU1 = np.dot(nU1.T, Wx[:,i:i+1]).T
+            fU2 = np.dot(nU2.T, Wy[:,i:i+1]).T
+
+            #fU1 = np.dot(nU1.T, Wx[:,20:21]).T
+            #fU2 = np.dot(nU2.T, Wy[:,20:21]).T
+       
+            fU1 = np.squeeze(np.asarray(fU1))
+            fU2 = np.squeeze(np.asarray(fU2))
+ 
+            #pl.plot(x, fU1, "r.", label="user1:"+str(row))
+            #pl.plot(x, fU2, "k.", label="user2:"+str(col))
+            pl.plot(x, fU1, label="user1:"+str(i), linestyle=ls[i])
+            pl.plot(x, fU2, label="user2:"+str(i), linestyle=ls[i])
+
+        leg = pl.legend()
+        leg.get_frame().set_alpha(0.5)
+        rho = round(ccaMat[row][col],5)
+        pl.title("canonical variate (eig val:"+str(rho)+")")
+
+        #print "fU1:"
+        #print fU1
+        #print "fU2:"
+        #print fU2
+
+        pl.draw()
+        #pl.show()
+        #pl.show() 
+
+
 class CCA(QtGui.QWidget):
 
     def __init__(self):
@@ -45,6 +129,9 @@ class CCA(QtGui.QWidget):
 
         #UIの初期化
         self.initUI()
+
+        #クラス間のデータ渡しテスト
+        self.test = 100
 
         #ROSのパブリッシャなどの初期化
         rospy.init_node('roscca', anonymous=True)
@@ -208,6 +295,7 @@ class CCA(QtGui.QWidget):
 
     def selectJoints(self):
         idx = [3, 4, 5, 6, 11, 12, 23, 24, 25, 26, 27, 28]
+        #idx = [0,1,2,7,8,9,10,13,14,15,16,17,18,19,20,21,22]
         self.dataDimen = len(idx)
         #idx = [1, 3]
         datas = []
@@ -270,51 +358,6 @@ class CCA(QtGui.QWidget):
         #self.updateColorTable()
         print "end"
 
-    """
-    def animetionTable(self):
-        delay = int(self.AnimeDelayBox.text())
-        
-        print "delay:"+str(delay)
-        #pl.clf()
-
-        #fig, ax = pl.subplots()
-        #pl.subplots_adjust(left=0.25, bottom=0.25)
-
-        pl.ion()
-        x = pl.arange(self.dataDimen+1)
-        y = pl.arange(self.dataDimen+1)
-        self.anim_X, self.anim_Y = pl.meshgrid(x, y)
-        
-        #axfreq = plt.axes([0, 0, self.dataMaxRange, self.dataMaxRange], axisbg=axcolor)
-        t=0
-        self.sliderColorTable(t, delay)
-
-    def sliderColorTable(self, t, delay):
-
-        pl.clf()
-        
-        pl.subplot(1,2,1)
-        pl.pcolor(self.anim_X, self.anim_Y, self.mWx[delay+(1+self.dataMaxRange)*t])
-        pl.gca().set_aspect('equal')
-        pl.colorbar()
-        pl.gray()
-        pl.title("user 1")
-        
-        pl.subplot(1,2,2)
-        pl.pcolor(self.anim_X, self.anim_Y, self.mWy[delay+(1+self.dataMaxRange)*t])
-        pl.gca().set_aspect('equal')
-        pl.colorbar()
-        pl.gray()
-        pl.title("user 2")
-        #pl.tight_layout()
-        
-        pl.draw()
-        #time.sleep(0.01)
-        
-        #pl.show()
-        #pl.show(block=False) 
-    """
-
 
     def updateColorTable(self, cItem):
         print "now viz:"+str(cItem.row())+","+str(cItem.column())
@@ -322,71 +365,8 @@ class CCA(QtGui.QWidget):
         row = cItem.row()
         col = cItem.column()
 
-        pl.clf()
-        #pl.ion()
-
-        Wx = self.mWx[row*self.dataMaxRange+col]
-        Wy = self.mWy[row*self.dataMaxRange+col]
-
-        x = pl.arange(self.dataDimen+1)
-        y = pl.arange(self.dataDimen+1)
-        X, Y = pl.meshgrid(x, y)
-        
-        pl.subplot2grid((2,2),(0,0))
-        pl.pcolor(X, Y, Wx)
-        pl.gca().set_aspect('equal')
-        pl.colorbar()
-        pl.gray()
-        pl.title("user 1:"+str(row))
-
-        pl.subplot2grid((2,2),(0,1))
-        pl.pcolor(X, Y, Wy)
-        pl.gca().set_aspect('equal')
-        pl.colorbar()
-        pl.gray()
-        pl.title("user 2:"+str(col))
-        #pl.tight_layout()
-        
-
-        #データの取得
-        U1 = []
-        U2 = []
-
-        for w in range(self.winSize):
-            U1.append(self.DATAS[0][row+w])
-            U2.append(self.DATAS[1][col+w])
-
-        nU1 = self.stdNorm(U1)
-        nU2 = self.stdNorm(U2)
-        x = np.linspace(0, self.winSize-1, self.winSize)
-
-        #forで回して第三位の正準相関までとる？
-        pl.subplot2grid((2,2),(1,0),colspan=2)
-        fU1 = np.dot(nU1.T, Wx[:,0:1]).T
-        fU2 = np.dot(nU2.T, Wy[:,0:1]).T
-
-        #fU1 = np.dot(nU1.T, Wx[:,20:21]).T
-        #fU2 = np.dot(nU2.T, Wy[:,20:21]).T
-       
-        fU1 = np.squeeze(np.asarray(fU1))
-        fU2 = np.squeeze(np.asarray(fU2))
- 
-        pl.plot(x, fU1, "r.", label="user1:"+str(row))
-        pl.plot(x, fU2, "k.", label="user2:"+str(col))
-        leg = pl.legend()
-        leg.get_frame().set_alpha(0.5)
-        rho = round(self.ccaMat[row][col],5)
-        pl.title("canonical variate (eig val:"+str(rho)+")")
-
-        #print "fU1:"
-        #print fU1
-        #print "fU2:"
-        #print fU2
-
-        pl.draw()
-        #pl.show()
-        pl.show(block=False) 
-
+        GRAPH().drawPlot(row,col,self.mWx, self.mWy, self.ccaMat, self.DATAS, self.dataMaxRange, self.dataDimen, self.winSize)
+        #GRAPH().drawPlot(row,col)
     def updateTable(self):
         
         self.threshold = float(self.ThesholdBox.text())
@@ -664,9 +644,18 @@ class CCA(QtGui.QWidget):
 
         return i
 
+#class TEST(object):
+
+    #corr = CCA()
+    #corr2 = GRAPH()
+
+
 def main():
     app = QtGui.QApplication(sys.argv)
+    #test = TEST()
     corr = CCA()
+    graph = GRAPH()
+
     sys.exit(app.exec_())
 
 
