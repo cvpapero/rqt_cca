@@ -45,6 +45,43 @@ class GRAPH(QtGui.QWidget):
         print CCA().test
 
 
+    def rhoPlot(self, ccaMat, filename, winsize, framesize):
+
+        dlen = len(ccaMat)
+        pl.clf()
+        pl.ion()
+
+        #np.zeros([self.dataDimen, self.dataDimen])     
+        """
+        tmpMat = np.array(ccaMat[0]) 
+        for i in range(dlen-1):
+            tmpMat = np.r_[tmpMat,ccaMat[i+1]]
+            print "tmpmat:"+str(i)
+            print tmpMat
+        ccaMat = tmpMat #np.matrix(ccaMat)
+        """
+        print "ccaMat:"
+        print ccaMat
+
+        #x = pl.arange(dlen)
+        #y = pl.arange(dlen)
+        print "dlen:"+str(dlen)
+        Y,X = np.mgrid[slice(0, dlen, 1),slice(0, dlen, 1)]
+
+        #print "len X:"+str(len(X))+", X:"+str(X)
+        #X, Y = np.mgrid[0:dlen:complex(0, dlen), 0:dlen:complex(0, dlen)]
+
+        #X, Y = pl.meshgrid(x, y)
+        pl.pcolor(X, Y, ccaMat)
+        pl.xlim(0,dlen-1)
+        pl.ylim(0,dlen-1)
+        #pl.pcolormesh(X, Y, ccaMat)
+        pl.colorbar()
+        pl.gray()
+        pl.draw()
+        outname = str(filename) + "_" + str(winsize) + "_" + str(framesize)+".png"
+        pl.savefig(outname)
+
     def drawPlot(self, row, col, mWx, mWy, ccaMat, DATAS, dataMaxRange, dataDimen, winSize):
         #def drawPlot(self, row, col):
         print "draw:"+str(row)+", "+str(col)
@@ -165,14 +202,14 @@ class CCA(QtGui.QWidget):
         
         #window size
         self.winSizeBox = QtGui.QLineEdit()
-        self.winSizeBox.setText('40')
+        self.winSizeBox.setText('120')
         self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.winSizeBox.setFixedWidth(100)
         form.addRow('window size', self.winSizeBox)
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('40')
+        self.frmSizeBox.setText('200')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -269,8 +306,8 @@ class CCA(QtGui.QWidget):
 
 
     def jsonInput(self):
-        filename = self.txtSepFile.text()
-        f = open(filename, 'r')
+        self.filename = self.txtSepFile.text()
+        f = open(self.filename, 'r')
         jsonData = json.load(f)
         #print json.dumps(jsonData, sort_keys = True, indent = 4)
         f.close()
@@ -282,10 +319,25 @@ class CCA(QtGui.QWidget):
             data = []
             self.datasSize = len(user["datas"])
             self.dataDimen = len(user["datas"][0]["data"])
+
             for j in range(self.datasSize):
                 data.append(user["datas"][j]["data"])
-
             self.DATAS.append(data)
+
+        
+        print "Data[0] max:"+str(max(max(self.DATAS[0])))+",min:"+str(min(min(self.DATAS[0])))
+        print "Data[1] max:"+str(max(max(self.DATAS[1])))+",min:"+str(min(min(self.DATAS[1])))
+        """
+        self.time = []
+        for t in jsonData[0]["datas"]:
+            self.time.append(float(t["time"]))
+        
+        print "time:"+str(self.time)
+        diff = self.time[1]-self.time[0]
+        print "diff:"+str(diff)
+        print "fps:"+str(1/diff)
+        """
+
         """
         print "DATAS[0]:"
         print self.DATAS[0]
@@ -315,7 +367,7 @@ class CCA(QtGui.QWidget):
 
     def cutDatas(self):
         
-        th = 200
+        th = 300
         
         if self.datasSize > th:
             datas = []
@@ -366,9 +418,11 @@ class CCA(QtGui.QWidget):
         col = cItem.column()
 
         GRAPH().drawPlot(row,col,self.mWx, self.mWy, self.ccaMat, self.DATAS, self.dataMaxRange, self.dataDimen, self.winSize)
+
         #GRAPH().drawPlot(row,col)
     def updateTable(self):
-        
+        GRAPH().rhoPlot(self.ccaMat, self.filename, self.winSize, self.frmSize)
+
         self.threshold = float(self.ThesholdBox.text())
         
         if(len(self.ccaMat)==0):
@@ -407,7 +461,7 @@ class CCA(QtGui.QWidget):
                     hot = False
                 
                 c = 0
-                rho = round(self.ccaMat[i][j])
+                rho = round(self.ccaMat[i][j],5)
                 if rho > self.threshold:
                     c = rho*255
 
@@ -423,7 +477,8 @@ class CCA(QtGui.QWidget):
     def canoniExec1(self):
 
         self.dataMaxRange = self.datasSize - self.winSize + 1
-        self.ccaMat = [[0 for i in range(self.dataMaxRange)] for j in range(self.dataMaxRange)]
+        #self.ccaMat = [[0 for i in range(self.dataMaxRange)] for j in range(self.dataMaxRange)]
+        self.ccaMat = np.zeros([self.dataMaxRange, self.dataMaxRange])
 
         self.frameRange = self.datasSize - self.frmSize + 1
         self.dataRange = self.frmSize - self.winSize + 1
@@ -542,6 +597,7 @@ class CCA(QtGui.QWidget):
 
         idx = lambs.argsort()[::-1]
         lambs = np.sqrt(lambs[idx])
+
         Wx=Wx[:,idx]
         Wy = np.dot(np.dot(Sxy.T, Wx), SLA.inv(np.diag(lambs)))
         print "lambs:"
@@ -564,7 +620,11 @@ class CCA(QtGui.QWidget):
 
         Wxl = np.dot(Wx,np.diag(lambs))
         Wyl = np.dot(Wy,np.diag(lambs))
-
+        
+        #print "Wyl:"
+        #print Wyl
+        #Wxl = np.zeros([self.dataDimen, self.dataDimen])
+        #Wyl = np.zeros([self.dataDimen, self.dataDimen])
         """
         print "wwx:"
         print wwx
@@ -615,6 +675,8 @@ class CCA(QtGui.QWidget):
         print "cov:"
         print np.cov(data_t)
         """
+        #ave = np.average(lambs)
+        lambs[0]
         return float(lambs[0]), Wxl, Wyl
 
 
