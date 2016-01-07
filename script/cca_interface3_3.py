@@ -132,14 +132,9 @@ class GRAPH(QtGui.QWidget):
             fU1 = np.dot(nU1.T, Wx[:,i:i+1]).T
             fU2 = np.dot(nU2.T, Wy[:,i:i+1]).T
 
-            #fU1 = np.dot(nU1.T, Wx[:,20:21]).T
-            #fU2 = np.dot(nU2.T, Wy[:,20:21]).T
-       
             fU1 = np.squeeze(np.asarray(fU1))
             fU2 = np.squeeze(np.asarray(fU2))
- 
-            #pl.plot(x, fU1, "r.", label="user1:"+str(row))
-            #pl.plot(x, fU2, "k.", label="user2:"+str(col))
+
             pl.plot(x, fU1, label="user1:"+str(i), linestyle=ls[i])
             pl.plot(x, fU2, label="user2:"+str(i), linestyle=ls[i])
 
@@ -603,7 +598,14 @@ class CCA(QtGui.QWidget):
         print "lambs:"
         print lambs
 
-        
+
+        #fU1 = np.dot(nU1.T, Wx[:,i:i+1]).T
+        #fU2 = np.dot(nU2.T, Wy[:,i:i+1]).T
+
+        #fU1 = np.squeeze(np.asarray(fU1))
+        #fU2 = np.squeeze(np.asarray(fU2))
+
+
         #wwx = np.fabs(Wx[:,0:1])
         #wwy = np.fabs(Wy[:,0:1])
         #maxWxIdx = max(enumerate(wwx), key=lambda x:x[1])[0]
