@@ -44,109 +44,29 @@ class GRAPH(QtGui.QWidget):
     def __init__(self):
         super(GRAPH, self).__init__()
 
-    def rhoPlot(self, cMat, filename, winsize, framesize):
+    def rhoAndSigPlot(self, cMat, sig1, sig2, filename, winsize, framesize):
 
-        dlen = len(ccaMat)
+        dlen = len(cMat)
         pl.clf()
         pl.ion()
 
-        #np.zeros([self.dataDimen, self.dataDimen])     
-        """
-        tmpMat = np.array(ccaMat[0]) 
-        for i in range(dlen-1):
-            tmpMat = np.r_[tmpMat,ccaMat[i+1]]
-            print "tmpmat:"+str(i)
-            print tmpMat
-        ccaMat = tmpMat #np.matrix(ccaMat)
-        """
-        print "ccaMat:"
-        print cMat
+        pl.subplot2grid((2,2),(0,0),colspan=2)
+        pl.plot(sig1, color='r')
+        pl.plot(sig2, color='b')
+        pl.title("red:user1, blue:user2")
 
-        #x = pl.arange(dlen)
-        #y = pl.arange(dlen)
-        print "dlen:"+str(dlen)
-        Y,X = np.mgrid[slice(0, dlen, 1),slice(0, dlen, 1)]
+        pl.subplot2grid((2,2),(1,0))
+        X, Y = pl.meshgrid(pl.arange(dlen), pl.arange(dlen))
+        pl.pcolor(X, Y, cMat[:,:,0])
+        pl.xlim(0,dlen)
+        pl.ylim(0,dlen)
 
-        #print "len X:"+str(len(X))+", X:"+str(X)
-        #X, Y = np.mgrid[0:dlen:complex(0, dlen), 0:dlen:complex(0, dlen)]
-
-        #X, Y = pl.meshgrid(x, y)
-        pl.pcolor(X, Y, cMat)
-        pl.xlim(0,dlen-1)
-        pl.ylim(0,dlen-1)
-        #pl.pcolormesh(X, Y, ccaMat)
         pl.colorbar()
         pl.gray()
         pl.draw()
         outname = str(filename) + "_" + str(winsize) + "_" + str(framesize)+".png"
         pl.savefig(outname)
 
-
-    def vecPlot(self, row, col, mWx, mWy, frmSize, winSize):
-        pl.clf()
-        pl.ion()
-
-        #pWy = mWy[row][col]
-        #まずはx方向のWx
-        pWx = mWx[row,col:(frmSize-winSize+1)+row,0,:]
-        pWx = np.sqrt(pWx * pWx)
-        r,c = pWx.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,0))
-        pl.pcolor(X, Y, pWx)
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_1 (t:"+str(row)+")")
-        pl.gray()
-
-
-        pWy = mWy[row,col:(frmSize-winSize+1)+row,0,:]
-        pWy = np.sqrt(pWy * pWy)
-        r,c = pWx.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,1))
-        pl.pcolor(X, Y, pWy)    
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_2 (t:"+str(col)+")")
-        pl.gray()
-
-        pl.draw()
-
-        print "pWx shape:",pWx.shape
-
-        #col = pWx[]
-        """
-        x = pl.arange(Dimen+1)
-        y = pl.arange(Range+1)
-        X, Y = pl.meshgrid(x, y)
-
-        matWx = []
-        matWy = []
-        for i in range(len(mWx)):
-
-
-            #第一固有ベクトルだけ
-            matWx.append(Wx[:,0])
-            matWy.append(Wy[:,0])
-
-        pl.pcolor(X, Y, vecWx)
-        pl.colorbar()
-        pl.gray()
-        pl.draw()
-        """
-        #print Wx
-
-       
-        #pl.plot() 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, DATAS, dataMaxRange, dataDimen, winSize):
         #def drawPlot(self, row, col):
@@ -490,9 +410,6 @@ class CCA(QtGui.QWidget):
         #大きすぎるデータの場合カットする
         self.cutDatas()
 
-        print self.DATAS[0][0]
-        print len(self.DATAS[0][0])
-
         signal_1 = []
         signal_2 = []
         order = 0
@@ -500,11 +417,7 @@ class CCA(QtGui.QWidget):
             signal_1.append(self.DATAS[0][i][order]*(180./np.pi))
             signal_2.append(self.DATAS[1][i][order]*(180./np.pi))
 
-    
-        pl.plot(signal_1, color='r')
-        pl.plot(signal_2, color='b')
-        pl.title("joint[0]_r:u1,b:u2")
-        pl.show()
+
         #print datas.shape
         #GRAPH().vecPlot()
 
@@ -512,7 +425,7 @@ class CCA(QtGui.QWidget):
         #self.canoniExec1()
         self.corrExec(signal_1, signal_2)
         #self.time_setting()
-        self.updateTable()
+        self.updateTable(signal_1, signal_2, filename)
         #self.updateColorTable()
         print "end"
 
@@ -527,8 +440,9 @@ class CCA(QtGui.QWidget):
         GRAPH().vecPlot(row, col, self.mWx, self.mWy, self.frmSize, self.winSize)
         
 
-    def updateTable(self):
-        GRAPH().rhoPlot(self.ccaMat, self.filename, self.winSize, self.frmSize)
+    def updateTable(self, sig1, sig2, filename):
+        #filename = str(filename).lstrip("/home/uema/catkin_ws/src/rqt_cca/")
+        GRAPH().rhoAndSigPlot(self.ccaMat, sig1, sig2, filename, self.winSize, self.frmSize)
 
         self.threshold = float(self.ThesholdBox.text())
         
@@ -581,7 +495,7 @@ class CCA(QtGui.QWidget):
         self.table.resizeColumnsToContents()
         self.table.setVisible(True)
 
-    def corrExec(sig1, sig2):
+    def corrExec(self, sig1, sig2):
         self.dataMaxRange = self.datasSize - self.winSize + 1
 
         self.ccaMat = np.zeros([self.dataMaxRange, self.dataMaxRange, self.dataDimen])
@@ -599,14 +513,10 @@ class CCA(QtGui.QWidget):
                     USER1 = []
                     USER2 = []
                     for w in range(self.winSize):
-                        USER1.append(self.DATAS[0][t1+f+w])
-                        USER2.append(self.DATAS[1][t2+f+w])
+                        USER1.append(sig1[t1+f+w])
+                        USER2.append(sig2[t2+f+w])
 
-                    tmp_rho, Wxl, Wyl = self.canoniCorr(USER1, USER2)
-                    # tmp_rho is np.array[]
-                    self.ccaMat[t1+f][t2+f] = tmp_rho
-                    self.mWx[t1+f][t2+f] = Wxl
-                    self.mWy[t1+f][t2+f] = Wyl
+                    self.ccaMat[t1+f][t2+f] = np.corrcoef(USER1, USER2)[0][1]
 
         
     def canoniExec1(self):

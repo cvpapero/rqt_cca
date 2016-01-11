@@ -50,31 +50,12 @@ class GRAPH(QtGui.QWidget):
         pl.clf()
         pl.ion()
 
-        #np.zeros([self.dataDimen, self.dataDimen])     
-        """
-        tmpMat = np.array(ccaMat[0]) 
-        for i in range(dlen-1):
-            tmpMat = np.r_[tmpMat,ccaMat[i+1]]
-            print "tmpmat:"+str(i)
-            print tmpMat
-        ccaMat = tmpMat #np.matrix(ccaMat)
-        """
-        print "ccaMat:"
-        print cMat
-
-        #x = pl.arange(dlen)
-        #y = pl.arange(dlen)
-        print "dlen:"+str(dlen)
         Y,X = np.mgrid[slice(0, dlen, 1),slice(0, dlen, 1)]
 
-        #print "len X:"+str(len(X))+", X:"+str(X)
-        #X, Y = np.mgrid[0:dlen:complex(0, dlen), 0:dlen:complex(0, dlen)]
+        pl.pcolor(X, Y, cMat[:,:,0])
+        pl.xlim(0,dlen)
+        pl.ylim(0,dlen)
 
-        #X, Y = pl.meshgrid(x, y)
-        pl.pcolor(X, Y, cMat)
-        pl.xlim(0,dlen-1)
-        pl.ylim(0,dlen-1)
-        #pl.pcolormesh(X, Y, ccaMat)
         pl.colorbar()
         pl.gray()
         pl.draw()
@@ -89,13 +70,15 @@ class GRAPH(QtGui.QWidget):
         #pWy = mWy[row][col]
         #まずはx方向のWx
         pWx = mWx[row,col:(frmSize-winSize+1)+row,0,:]
+        #print "pWx sum:",np.sum(pWx[0,:])
+        print np.mean(pWx*pWx, axis=0)
         pWx = np.sqrt(pWx * pWx)
         r,c = pWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
         X, Y = pl.meshgrid(x, y)
 
-        pl.subplot2grid((1,2),(0,0))
+        pl.subplot2grid((2,2),(0,0))
         pl.pcolor(X, Y, pWx)
         pl.xlim(0,c)
         pl.ylim(0,r)
@@ -103,15 +86,18 @@ class GRAPH(QtGui.QWidget):
         pl.title("user_1 (t:"+str(row)+")")
         pl.gray()
 
-
+        #いまだけ
         pWy = mWy[row,col:(frmSize-winSize+1)+row,0,:]
+        #print "pWy sum:",np.sum(pWy[0,:],axis=1)
+        #print np.sum(pWy*pWy,axis=1)
+        #print np.mean(pWy*pWy, axis=0)
         pWy = np.sqrt(pWy * pWy)
         r,c = pWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
         X, Y = pl.meshgrid(x, y)
 
-        pl.subplot2grid((1,2),(0,1))
+        pl.subplot2grid((2,2),(0,1))
         pl.pcolor(X, Y, pWy)    
         pl.xlim(0,c)
         pl.ylim(0,r)
@@ -119,34 +105,14 @@ class GRAPH(QtGui.QWidget):
         pl.title("user_2 (t:"+str(col)+")")
         pl.gray()
 
+        pl.subplot2grid((2,2),(1,0),colspan=2)
+        pl.plot(np.mean(pWx*pWx, axis=0),color="r")
+        pl.plot(np.mean(pWy*pWy, axis=0),color="b")
+
         pl.draw()
 
         print "pWx shape:",pWx.shape
 
-        #col = pWx[]
-        """
-        x = pl.arange(Dimen+1)
-        y = pl.arange(Range+1)
-        X, Y = pl.meshgrid(x, y)
-
-        matWx = []
-        matWy = []
-        for i in range(len(mWx)):
-
-
-            #第一固有ベクトルだけ
-            matWx.append(Wx[:,0])
-            matWy.append(Wy[:,0])
-
-        pl.pcolor(X, Y, vecWx)
-        pl.colorbar()
-        pl.gray()
-        pl.draw()
-        """
-        #print Wx
-
-       
-        #pl.plot() 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, DATAS, dataMaxRange, dataDimen, winSize):
         #def drawPlot(self, row, col):
@@ -255,17 +221,9 @@ class GRAPH(QtGui.QWidget):
         pl.yticks(fontsize=10)
         pl.title("canonical variate (eig val:"+rhos.rstrip(", ")+")",fontsize=11)
 
-        #print "fU1:"
-        #print fU1
-        #print "fU2:"
-        #print fU2
         pl.tight_layout()
-
         pl.draw()
-        #pl.show()
-        #pl.show() 
 
-        
 
 class CCA(QtGui.QWidget):
 
@@ -339,36 +297,11 @@ class CCA(QtGui.QWidget):
         boxUpDate.addWidget(btnUpDate)
         form.addRow('corr theshold', boxUpDate)
 
-
-
-        """
-        self.AnimeDelayBox =  QtGui.QLineEdit()
-        self.AnimeDelayBox.setText('0')
-        self.AnimeDelayBox.setAlignment(QtCore.Qt.AlignRight)
-        self.AnimeDelayBox.setFixedWidth(100)
-
-        btnAnime =  QtGui.QPushButton('create')
-        btnAnime.setMaximumWidth(100)
-        btnAnime.clicked.connect(self.animetionTable)
-        boxAnime = QtGui.QHBoxLayout()
-        boxAnime.addWidget(self.AnimeDelayBox)
-        boxAnime.addWidget(btnAnime)
-        form.addRow('delay', boxAnime)
-        """
-
         #exec
         boxCtrl = QtGui.QHBoxLayout()
         btnExec = QtGui.QPushButton('exec')
         btnExec.clicked.connect(self.doExec)
         boxCtrl.addWidget(btnExec)
-        
-        """
-        #update
-        boxUDCtrl = QtGui.QHBoxLayout()
-        btnUDExec = QtGui.QPushButton('update')
-        btnUDExec.clicked.connect(self.updateTable)
-        boxUDCtrl.addWidget(btnUDExec)
-        """
 
         #テーブルの初期化
         #horizonはuser2の時間
@@ -449,14 +382,10 @@ class CCA(QtGui.QWidget):
                 #print "---"
             #print "uses:"+str(uses)
             datas.append(uses)
-
         self.DATAS = datas
 
-
-    def cutDatas(self):
-        
+    def cutDatas(self):        
         th = 300
-        
         if self.datasSize > th:
             datas = []
             for data in self.DATAS:
@@ -660,9 +589,6 @@ class CCA(QtGui.QWidget):
         #print np.cov(snU)
 
         return snU
-
-    def maxIdx(self, U):
-        pass
 
     """
     正準相関

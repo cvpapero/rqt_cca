@@ -1,0 +1,132 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+"""
+2016.1.11
+決定版をつくる
+
+"""
+
+import sys
+import os.path
+import math
+import json
+import time
+
+import numpy as np
+from numpy import linalg as NLA
+import scipy as sp
+from scipy import linalg as SLA
+
+from PyQt4 import QtGui, QtCore
+from PyQt4.QtCore import *
+from PyQt4.QtGui  import *
+
+#from pylab import *
+import pylab as pl
+import rospy
+
+
+class CCA(QtGui.QWidget):
+
+    def __init__(self):
+
+        super(CCA, self).__init__()
+
+        #UIの初期化
+        self.initUI()
+
+    def initUI(self):
+        grid = QtGui.QGridLayout()
+        form = QtGui.QFormLayout()
+        
+        #ファイル入力ボックス
+        self.txtSepFile = QtGui.QLineEdit()
+        btnSepFile = QtGui.QPushButton('...')
+        btnSepFile.setMaximumWidth(40)
+        btnSepFile.clicked.connect(self.chooseDbFile)
+        boxSepFile = QtGui.QHBoxLayout()
+        boxSepFile.addWidget(self.txtSepFile)
+        boxSepFile.addWidget(btnSepFile)
+        form.addRow('input file', boxSepFile)
+        
+        #window size
+        self.winSizeBox = QtGui.QLineEdit()
+        self.winSizeBox.setText('90')
+        self.winSizeBox.setAlignment(QtCore.Qt.AlignRight)
+        self.winSizeBox.setFixedWidth(100)
+        form.addRow('window size', self.winSizeBox)
+
+        #frame size
+        self.frmSizeBox = QtGui.QLineEdit()
+        self.frmSizeBox.setText('110')
+        self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
+        self.frmSizeBox.setFixedWidth(100)
+        form.addRow('frame size', self.frmSizeBox)
+
+        #selected joints
+        self.selected = QtGui.QRadioButton('selected')
+        form.addRow('dimension', self.selected)
+
+
+        #tableに表示する相関係数のしきい値
+        self.ThesholdBox = QtGui.QLineEdit()
+        self.ThesholdBox.setText('0.0')
+        self.ThesholdBox.setAlignment(QtCore.Qt.AlignRight)
+        self.ThesholdBox.setFixedWidth(100)
+
+        btnUpDate =  QtGui.QPushButton('update')
+        btnUpDate.setMaximumWidth(100)
+        btnUpDate.clicked.connect(self.updateTable)
+        boxUpDate = QtGui.QHBoxLayout()
+        boxUpDate.addWidget(self.ThesholdBox)
+        boxUpDate.addWidget(btnUpDate)
+        form.addRow('corr theshold', boxUpDate)
+
+        #exec
+        boxCtrl = QtGui.QHBoxLayout()
+        btnExec = QtGui.QPushButton('exec')
+        btnExec.clicked.connect(self.doExec)
+        boxCtrl.addWidget(btnExec)
+
+        #テーブルの初期化
+        #horizonはuser2の時間
+        self.table = QtGui.QTableWidget(self)
+        self.table.setColumnCount(0)
+        self.table.setHorizontalHeaderLabels("use_2 time") 
+        jItem = QtGui.QTableWidgetItem(str(0))
+        self.table.setHorizontalHeaderItem(0, jItem)
+
+        #アイテムがクリックされたらグラフを更新
+        self.table.itemClicked.connect(self.updateColorTable)
+        self.table.setItem(0, 0, QtGui.QTableWidgetItem(1))
+
+        boxTable = QtGui.QHBoxLayout()
+        boxTable.addWidget(self.table)
+ 
+        #配置
+        grid.addLayout(form,1,0)
+        grid.addLayout(boxCtrl,2,0)
+        #grid.addLayout(boxUDCtrl,3,0)
+        grid.addLayout(boxTable,3,0)
+
+        self.setLayout(grid)
+        self.resize(400,100)
+
+        self.setWindowTitle("cca window")
+        self.show()
+
+
+
+
+
+
+def main():
+    app = QtGui.QApplication(sys.argv)
+    corr = CCA()
+    graph = GRAPH()
+
+    sys.exit(app.exec_())
+
+if __name__=='__main__':
+    main()
