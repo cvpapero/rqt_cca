@@ -22,9 +22,11 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
 
-#from pylab import *
 import pylab as pl
 import rospy
+
+import pyper
+import pandas as pd
 
 class GRAPH(QtGui.QWidget):
     def __init__(self):
@@ -49,23 +51,23 @@ class GRAPH(QtGui.QWidget):
         pl.savefig(outname)
 
 
-    def vecPlot(self, row, col, mWx, mWy, frmSize, winSize):
+    def vecPlot(self, row, col, r_m, mWx, mWy, data1, data2, frmSize, winSize):
         pl.clf()
         pl.ion()
 
         #pWy = mWy[row][col]
         #まずはx方向のWx
-        pWx = mWx[row,col:(frmSize-winSize+1)+row,0,:]
+        pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
         #print "pWx sum:",np.sum(pWx[0,:])
         print np.mean(pWx*pWx, axis=0)
-        pWx = np.sqrt(pWx * pWx)
-        r,c = pWx.shape
+        sqWx = np.sqrt(pWx * pWx)
+        r,c = sqWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
         X, Y = pl.meshgrid(x, y)
 
         pl.subplot2grid((2,2),(0,0))
-        pl.pcolor(X, Y, pWx)
+        pl.pcolor(X, Y, sqWx)
         pl.xlim(0,c)
         pl.ylim(0,r)
         pl.colorbar()
@@ -73,18 +75,18 @@ class GRAPH(QtGui.QWidget):
         pl.gray()
 
         
-        pWy = mWy[row,col:(frmSize-winSize+1)+row,0,:]
+        pWy = mWy[row,col:(frmSize-winSize+1)+row,:,0]
         #print "pWy sum:",np.sum(pWy[0,:],axis=1)
         #print np.sum(pWy*pWy,axis=1)
         #print np.mean(pWy*pWy, axis=0)
-        pWy = np.sqrt(pWy * pWy)
-        r,c = pWx.shape
+        sqWy = np.sqrt(pWy * pWy)
+        r,c = sqWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
         X, Y = pl.meshgrid(x, y)
 
         pl.subplot2grid((2,2),(0,1))
-        pl.pcolor(X, Y, pWy)    
+        pl.pcolor(X, Y, sqWy)    
         pl.xlim(0,c)
         pl.ylim(0,r)
         pl.colorbar()
@@ -97,6 +99,70 @@ class GRAPH(QtGui.QWidget):
         for i in range(pc):
             pl.plot(pWx[:,i], color="r")
         """
+
+        xl = np.arange(c)        
+        pl.subplot2grid((2,2),(1,0))
+        pl.bar(xl, np.mean(sqWx, axis=0))
+        pl.xlim(0,c)
+        pl.ylim(0,1)
+
+        pl.subplot2grid((2,2),(1,1))
+        pl.bar(xl, np.mean(sqWy, axis=0))
+        pl.xlim(0,c)
+        pl.ylim(0,1)
+        """
+        pl.subplot2grid((2,2),(1,0),colspan=2)
+        U1 = []
+        U2 = []
+        od = 0
+        for w in range(winSize):
+            U1.append(data1[row+w][od])
+            U2.append(data2[col+w][od])
+        pl.plot(U1, color="r")
+        pl.plot(U2, color="b")        
+        """
+        """
+        #正準相関変量の表示
+        U1 = []
+        U2 = []
+        for w in range(winSize):
+            U1.append(data1[row+w])
+            U2.append(data2[col+w])
+        U1 = np.array(U1)
+        U2 = np.array(U2)
+        U1 = U1 - U1.mean(axis=0)
+        U2 = U2 - U2.mean(axis=0)
+
+        print "u1 s:",U1.shape
+        print "wx s:",mWx[row,col,0,:].shape
+    
+        ls = ["-","--","-."]
+        rhos = ""
+        order = 3
+        xl = np.linspace(0, winSize-1, winSize)
+        for i in range(order):
+
+            fU1 = np.dot(U1, mWx[row,col,i,:]).T
+            fU2 = np.dot(U2, mWy[row,col,i,:]).T
+
+            fU1 = np.squeeze(np.asarray(fU1))
+            fU2 = np.squeeze(np.asarray(fU2))
+
+            rho = round(r_m[row][col][i],5)
+
+            pl.plot(xl, fU1, label="user1:"+str(rho), linestyle=ls[i])
+            pl.plot(xl, fU2, label="user2:"+str(rho), linestyle=ls[i])
+            rhos += str(rho)+", "
+
+        leg = pl.legend(prop={'size':9})
+        leg.get_frame().set_alpha(0.7)
+        pl.title("canonical variate (eig val:"+rhos.rstrip(", ")+")",fontsize=11)
+        """
+        pl.xticks(fontsize=10)
+        pl.yticks(fontsize=10)
+
+        pl.tight_layout()
+
         pl.draw()
 
         #print "pWx shape:",pWx.shape
@@ -307,11 +373,12 @@ class CCA(QtGui.QWidget):
         r = cItem.row()
         c = cItem.column()
         print "now viz r:",r,", c:",c
+        print "cca:",self.r_m[r][c]
         #GRAPH().drawPlot(r, c, self.wx_m, self.wy_m, self.r_m, self.data1, self.data2, self.dtmr, self.dtd, self.wins)
-        GRAPH().vecPlot(r, c, self.wx_m, self.wy_m, self.frms, self.wins)
+        GRAPH().vecPlot(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.frms, self.wins)
         
     def updateTable(self):
-        #GRAPH().rhoPlot(self.ccaMat, self.filename, self.winSize, self.frmSize)
+        #GRAPH().rhoPlot(self.r_m, self.filename, self.wins, self.frms)
         th = float(self.ThesholdBox.text())
         if(len(self.r_m)==0):
             print "No Corr Data! Push exec button..."
@@ -395,7 +462,7 @@ class CCA(QtGui.QWidget):
         f.close()
         datas = []
         for user in jsonData:
-            #angle
+            #data is joint angle
             data = []
             #dts:data_size, dtd:data_dimension
             self.dts = len(user["datas"])
@@ -407,6 +474,7 @@ class CCA(QtGui.QWidget):
 
     def selectInput(self, data1, data2):
         idx = [3, 4, 5, 6, 11, 12, 23, 24, 25, 26, 27, 28]
+        #idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,0]
         #idx = [3, 4, 5, 6, 11, 12]
         self.dtd = len(idx)
         datas1 = []
@@ -472,46 +540,73 @@ class CCA(QtGui.QWidget):
                         u1.append(data1[od+w])
                         u2.append(data2[f+t2+w])
                     r_m[od][f+t2], wx_m[od][f+t2], wy_m[od][f+t2] = self.cca(u1, u2)
+
         return r_m, wx_m, wy_m
 
     def cca1(self, u1, u2):
         #n = len(u1)
         p = len(u1[0])
         #ave=0, Sxx=I
-        S = np.cov(np.r_[self.stdn(u1), self.stdn(u2)])
+        #S = np.cov(np.r_[self.stdn(u1), self.stdn(u2)])
+        #u1 = np.array(self.stdn(u1))
+        #u2 = np.array(u2)
+        S = np.cov(self.stdn(u1), self.stdn(u2), bias=1)
         Sxy = S[:p,p:]
         lambs, wx = NLA.eig(np.dot(Sxy, Sxy.T))
         #順番の入れ替え
-        print "bf lambs:",lambs
-        print "wx:",wx
+        #print "bf lambs:",lambs
+        #print "wx:",wx
 
         idx = lambs.argsort()[::-1]
         lambs = np.sqrt(lambs[idx])
         wx = wx[:,idx]
 
-        print "idx",idx
-        print "af lambs:",lambs
-        print "wx:",wx
-        wx2 = wx*wx
-        print "wx^2.sum(0):",wx2.sum(axis=0) 
-        print "wx^2.sum(1):",wx2.sum(axis=1)
+        #print "idx",idx
+        #print "af lambs:",lambs
+        #print "wx:",wx
+        #wx2 = wx*wx
+        #print "wx^2.sum(0):",wx2.sum(axis=0) 
+        #print "wx^2.sum(1):",wx2.sum(axis=1)
 
         wy = np.dot(np.dot(Sxy.T, wx), SLA.inv(np.diag(lambs)))
 
-        wy2 = wy*wy
-        print "wy^2.sum(0):",wy2.sum(axis=0) 
-        print "wy^2.sum(1):",wy2.sum(axis=1)
+        #wy2 = wy*wy
+        #print "wy^2.sum(0):",wy2.sum(axis=0) 
+        #print "wy^2.sum(1):",wy2.sum(axis=1)
 
         return np.array(lambs), wx, wy
-
+        
+    """
     #正規化
     def stdn(self, u):
-        mat =  np.matrix(u).T - np.matrix(u).T.mean(axis=1)
+        mat =  np.array(u).T - np.array(u).T.mean(axis=0)
+        #print mat
+        #print mat.shape
+        mcov = np.cov(u)
+        #print mcov.shape
+        p,l,pt = NLA.svd(mcov)
+        lsi = SLA.sqrtm(SLA.inv(np.diag(l))) 
+        print lsi.shape
+        print p.T.shape
+        print mat.shape
+
+        snu =  np.dot(np.dot(lsi, p.T), mat.T)
+        return snu
+    """
+    #正規化
+    def stdn(self, U):
+        mat = np.matrix(U).T
+        mat = mat - mat.mean(axis=1)
         mcov = np.cov(mat)
         p,l,pt = NLA.svd(mcov)
         lsi = SLA.sqrtm(SLA.inv(np.diag(l))) 
-        snu =  np.dot(np.dot(lsi, p.T), mat)
-        return snu
+        snU =  np.dot(np.dot(lsi, p.T), mat)
+
+        #print "cov:"
+        #print np.cov(snU)
+
+        return snU
+
 
     def cca(self, X, Y):
         '''
@@ -545,6 +640,55 @@ class CCA(QtGui.QWidget):
 
         return s, A, B
 
+
+    def ccaR(self, U1, U2):
+
+        r = pyper.R(use_pandas='True')
+
+        for i, u in enumerate(U1):
+            out = "x"+str(i)+"<-c(" 
+            for j, el in enumerate(u):
+                if j != len(u)-1:
+                    out += str(el)+", "
+                else:
+                    out += str(el)+")"
+            r(out)
+                    
+        for i, u in enumerate(U2):
+            out = "y"+str(i)+"<-c(" 
+            for j, el in enumerate(u):
+                if j != len(u)-1:
+                    out += str(el)+", "
+                else:
+                    out += str(el)+")"
+            r(out)
+
+        out = "f<-rbind("            
+        for i in range(len(U1)):
+            if i != len(U1)-1:
+                out += "x"+str(i)+","
+            else:
+                out += "x"+str(i)+")"
+        r(out)
+
+        out = "g<-rbind("            
+        for i in range(len(U2)):
+            if i != len(U2)-1:
+                out += "y"+str(i)+","
+            else:
+                out += "y"+str(i)+")"
+        r(out)
+
+        r("can <- cancor(f,g)")
+        r("lambs <- can$cor")
+        r("Wx <- can$xcoef")
+        r("Wy <- can$ycoef")
+
+        lambs = r.lambs
+        Wx = r.Wx
+        Wy = r.Wy
+
+        return lambs, Wx, Wy
 
 def main():
     app = QtGui.QApplication(sys.argv)
