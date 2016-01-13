@@ -21,8 +21,8 @@ class Dummy():
     def jsonCreate(self):
 
         usize = 2
-        nsize = 300
-        psize = 29
+        nsize = 15#300
+        psize = 4#29
         
         users = []
         for u in range(usize): 
@@ -31,7 +31,7 @@ class Dummy():
                 rjs = []
                 for p in range(psize):
                     rj = random.uniform(0.1, 3.14)
-                    rjs.append(rj)
+                    rjs.append(round(rj,3))
                 ds = {"data":rjs}
                 ds_array.append(ds)
         

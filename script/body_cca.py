@@ -59,7 +59,7 @@ class GRAPH(QtGui.QWidget):
         #まずはx方向のWx
         pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
         #print "pWx sum:",np.sum(pWx[0,:])
-        print np.mean(pWx*pWx, axis=0)
+        #print np.mean(pWx*pWx, axis=0)
         sqWx = np.sqrt(pWx * pWx)
         r,c = sqWx.shape
         x = pl.arange(c+1)
@@ -102,14 +102,22 @@ class GRAPH(QtGui.QWidget):
 
         xl = np.arange(c)        
         pl.subplot2grid((2,2),(1,0))
-        pl.bar(xl, np.mean(sqWx, axis=0))
+        subx1 = np.delete(sqWx,0,0)
+        subx2 = np.delete(sqWx,r-1,0)
+        print "sum sub:",sum(subx2-subx1)
+        pl.bar(xl, np.fabs(np.mean(subx2-subx1,axis=0)))
+        #pl.bar(xl, np.std(sqWx, axis=0))
         pl.xlim(0,c)
-        pl.ylim(0,1)
+        #pl.ylim(0,1)
 
         pl.subplot2grid((2,2),(1,1))
-        pl.bar(xl, np.mean(sqWy, axis=0))
+        subx1 = np.delete(sqWy,0,0)
+        subx2 = np.delete(sqWy,r-1,0)
+        pl.bar(xl, np.fabs(np.mean(subx2-subx1,axis=0)))
+        #pl.bar(xl, np.std(sqWy, axis=0))
         pl.xlim(0,c)
-        pl.ylim(0,1)
+        #pl.ylim(0,1)
+
         """
         pl.subplot2grid((2,2),(1,0),colspan=2)
         U1 = []
@@ -420,7 +428,9 @@ class CCA(QtGui.QWidget):
         self.table.setVisible(True)
 
     def doExec(self):
-        print "exec!"
+        #print "exec!"
+
+        self.out = 0
 
         self.data1 = []
         self.data2 = []
@@ -430,7 +440,7 @@ class CCA(QtGui.QWidget):
         self.frms = int(self.frmSizeBox.text())
 
         hitbtn = self.selected.isChecked()
-        print "setect joints:"+str(hitbtn)
+        #print "setect joints:"+str(hitbtn)
         #input file
         filename = self.txtSepFile.text()
         self.data1, self.data2 = self.jsonInput(filename)
@@ -445,10 +455,10 @@ class CCA(QtGui.QWidget):
         self.frmr = self.dts - self.frms + 1
         self.dtr = self.frms - self.wins + 1
 
-        print "datas_size:",self.dts
-        print "data_max_range:",self.dtmr
-        print "frame_range:",self.frmr
-        print "data_range:",self.dtr
+        #print "datas_size:",self.dts
+        #print "data_max_range:",self.dtmr
+        #print "frame_range:",self.frmr
+        #print "data_range:",self.dtr
 
         #rho_m:rho_matrix[dmr, dmr, datadimen] is corrs
         #wx_m and wy_m is vectors
@@ -475,7 +485,7 @@ class CCA(QtGui.QWidget):
     def selectInput(self, data1, data2):
         idx = [3, 4, 5, 6, 11, 12, 23, 24, 25, 26, 27, 28]
         #idx = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,0]
-        #idx = [3, 4, 5, 6, 11, 12]
+        #idx = [1,2,3,0]
         self.dtd = len(idx)
         datas1 = []
         datas2 = []
@@ -509,6 +519,8 @@ class CCA(QtGui.QWidget):
     def ccaExec(self, data1, data2):
         #rho_m:rho_matrix[dmr, dmr, datadimen] is corrs
         #wx_m and wy_m is vectors
+
+        s = 0
         r_m = np.zeros([self.dtmr, self.dtmr, self.dtd])
         wx_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])
         wy_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])
@@ -523,7 +535,7 @@ class CCA(QtGui.QWidget):
                         for w in range(self.wins):
                             u1.append(data1[t1+f+w])
                             u2.append(data2[t2+f+w])
-                        r_m[t1+f][t2+f], wx_m[t1+f][t2+f], wy_m[t1+f][t2+f] = self.cca(u1, u2)
+                        r_m[t1+f][t2+f], wx_m[t1+f][t2+f], wy_m[t1+f][t2+f] = self.ccas(u1, u2, s)
             else:
                 od = f+self.dtr-1
                 for t1 in range(self.dtr-1):
@@ -532,16 +544,27 @@ class CCA(QtGui.QWidget):
                     for w in range(self.wins):
                         u1.append(data1[f+t1+w])
                         u2.append(data2[od+w])
-                    r_m[t1+f][od], wx_m[t1+f][od], wy_m[t1+f][od] = self.cca(u1, u2)
+                    r_m[t1+f][od], wx_m[t1+f][od], wy_m[t1+f][od] = self.ccas(u1, u2, s)
                 for t2 in range(self.dtr):
                     u1 = []
                     u2 = []
                     for w in range(self.wins):
                         u1.append(data1[od+w])
                         u2.append(data2[f+t2+w])
-                    r_m[od][f+t2], wx_m[od][f+t2], wy_m[od][f+t2] = self.cca(u1, u2)
-
+                    r_m[od][f+t2], wx_m[od][f+t2], wy_m[od][f+t2] = self.ccas(u1, u2, s)
         return r_m, wx_m, wy_m
+
+    def ccas(self, u1, u2, s):
+        if s == 0:
+            r,x,y = self.cca(u1, u2)
+            return r, x, y
+        elif s == 1:
+            r,x,y = self.cca1(u1, u2)
+            return r, x, y
+        else:
+            r,x,y = self.cca2(u1, u2)
+            return r, x, y
+
 
     def cca1(self, u1, u2):
         #n = len(u1)
@@ -550,9 +573,20 @@ class CCA(QtGui.QWidget):
         #S = np.cov(np.r_[self.stdn(u1), self.stdn(u2)])
         #u1 = np.array(self.stdn(u1))
         #u2 = np.array(u2)
+        
+        if self.out == 0:
+            #print "u1:",u1
+            print "len(u1):",len(u1),",len(u1[0]):",len(u1[0])
+            #print u1.shape
+            stds = self.stdn(u1)
+            sr,sc=stds.shape
+            print "std u1:",stds
+            self.out = 1
+
         S = np.cov(self.stdn(u1), self.stdn(u2), bias=1)
         Sxy = S[:p,p:]
         lambs, wx = NLA.eig(np.dot(Sxy, Sxy.T))
+        #print "wx:",wx
         #順番の入れ替え
         #print "bf lambs:",lambs
         #print "wx:",wx
@@ -598,10 +632,20 @@ class CCA(QtGui.QWidget):
         mat = np.matrix(U).T
         mat = mat - mat.mean(axis=1)
         mcov = np.cov(mat)
-        p,l,pt = NLA.svd(mcov)
+        p,l,pt = SLA.svd(mcov)
         lsi = SLA.sqrtm(SLA.inv(np.diag(l))) 
-        snU =  np.dot(np.dot(lsi, p.T), mat)
+        H = np.dot(lsi, p.T)
+        snU = np.dot(H, mat)
 
+        if self.out == 0:
+            print "u:",np.matrix(U).T
+            print "mat:",mat
+            print "mcov:",mcov
+            print "p:",p
+            print "l:",l
+            print "pt"
+            print "lsi:",lsi
+            print np.dot(lsi, p.T)
         #print "cov:"
         #print np.cov(snU)
 
@@ -637,9 +681,42 @@ class CCA(QtGui.QWidget):
         M = np.dot(np.dot(sqx, SXY), sqy.T) # SXX^(-1/2) * SXY * SYY^(-T/2)
         A, s, Bh = SLA.svd(M, full_matrices=False)
         B = Bh.T      
-
+        #print np.dot(np.dot(A[:,0].T,SXX),A[:,0])
         return s, A, B
 
+    def cca2(self, X, Y):
+        #係数が1以下にならない...??
+        #row:window size, col:data dimen
+        X = np.array(X)
+        Y = np.array(Y)
+        n, p = X.shape
+        n, q = Y.shape
+        #print X.shape
+        # std
+        X = (X - X.mean(axis=0))/X.std(axis=0)
+        Y = (Y - Y.mean(axis=0))/X.std(axis=0)
+
+        R = np.corrcoef(X.T,Y.T)
+
+        R11 = R[:p,:p]
+        R12 = R[:p,p:]
+        R22 = R[p:,:p]
+        #print R.shape
+        #print R11.shape
+        # print R12.shape
+        #print R22.shape
+
+        A = np.dot(np.dot(np.dot(NLA.inv(R11),R12),NLA.inv(R22)),R12.T)
+        lambs, wx = NLA.eig(A)
+        #順番の入れ替え
+        #print "bf lambs:",lambs
+        #print "wx:",wx
+        idx = lambs.argsort()[::-1]
+        lambs = np.sqrt(lambs[idx])
+        wx = wx[:,idx]
+        wy = np.dot(np.dot(NLA.inv(R22), R12.T), NLA.inv(np.diag(lambs)))
+
+        return lambs, wx, wy
 
     def ccaR(self, U1, U2):
 
