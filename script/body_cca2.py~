@@ -28,14 +28,6 @@ import rospy
 import pyper
 import pandas as pd
 
-import rospy
-from visualization_msgs.msg import MarkerArray
-from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point
-from geometry_msgs.msg import PointStamped
-from std_msgs.msg import ColorRGBA
-
-
 class GRAPH(QtGui.QWidget):
     def __init__(self):
         super(GRAPH, self).__init__()
@@ -59,54 +51,6 @@ class GRAPH(QtGui.QWidget):
         pl.savefig(outname)
 
 
-    def vecPlot2(self, row, col, r_m, mWx, mWy, data1, data2, dmr, frmSize, winSize):
-        pl.clf()
-        pl.ion()
-        pWx = []
-        l = dmr - row - col
-        for f in range(l):
-            pWx.append(mWx[row+f, col+f,:,0])
-        pWx = np.array(pWx)
-
-        sqWx = np.sqrt(pWx * pWx)
-        print sqWx
-        r,c = sqWx.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,0))
-        pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_1 (t:"+str(row)+")")
-        pl.gray()
-
-        pWy = []
-        l = dmr - row - col
-        for f in range(l):
-            pWy.append(mWy[row+f, col+f,:,0])
-        pWy = np.array(pWy)
-
-        sqWy = np.sqrt(pWy * pWy)
-        print sqWy
-        r,c = sqWy.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,1))
-        pl.pcolor(X, Y, sqWy, vmin=0, vmax=1)
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_2 (t:"+str(col)+")")
-        pl.gray()
-
-        pl.tight_layout()
-        pl.draw()
-
     def vecPlot(self, row, col, r_m, mWx, mWy, data1, data2, frmSize, winSize):
         pl.clf()
         pl.ion()
@@ -114,10 +58,9 @@ class GRAPH(QtGui.QWidget):
         #pWy = mWy[row][col]
         #まずはx方向のWx
         pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
-
+        #print "pWx sum:",np.sum(pWx[0,:])
         #print np.mean(pWx*pWx, axis=0)
         sqWx = np.sqrt(pWx * pWx)
-        print sqWx
         r,c = sqWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
@@ -231,80 +174,7 @@ class GRAPH(QtGui.QWidget):
 
         pl.draw()
 
-        #outname =  "_" + str(winsize) + "_" + str(framesize)+".png"
-        #pl.savefig(outname)
-
         #print "pWx shape:",pWx.shape
-
-
-    def vecPlotSave(self, row, col, r_m, mWx, mWy, data1, data2, dtmr, frmSize, winSize):
-
-        pl.clf()
-        pl.ion()
-
-        #pWy = mWy[row][col]
-        #まずはx方向のWx
-        lg = dtmr - (frmSize-winSize)*2
-        pWxs=[]
-        #pWys=[]
-        for f in range(lg):
-            print str(f),"/",str(lg),"--- row:",row+f,", col:",col+f
-            pWx=mWx[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            sqWx = np.fabs(pWx)
-            #eigWx = 
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,0),rowspan=2)
-            pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_1 (t:"+str(row+f)+")")
-            pl.gray()
-
-            pWy = mWy[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            #pWy = pWx
-            #sqWy = np.dot(np.diag(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0]),np.fabs(pWy))
-            sqWy = np.fabs(pWy)
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,1),rowspan=2)
-            pl.pcolor(X, Y, sqWy,vmin=0, vmax=1)    
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_2 (t:"+str(col+f)+"-"+str((frmSize-winSize+1)+row+f)+")")
-            pl.gray()
-        
-            #固有値をとってみる
-            xl = np.arange(r)
-            #xl = np.arange(c)
-            
-            pl.subplot2grid((3,2),(2,0),colspan=2)
-            #pl.bar(xl, np.mean(sqWx, axis=0))
-            #pl.bar(xl, r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            #pl.plot(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            cc = r_m[row+f,col+f:(frmSize-winSize+1)+row+f,:]
-            X, Y = pl.meshgrid(pl.arange(r+1), pl.arange(c+1))
-            pl.pcolor(X, Y, cc.T, vmin=0, vmax=1)
-            pl.xlim(0,r)
-            pl.ylim(0,c)
-            pl.colorbar()
-            #pl.ylim(0.85,1)
-            """
-            pl.subplot2grid((2,2),(1,1))
-            pl.bar(xl, np.mean(sqWy, axis=0))
-            pl.xlim(0,c)
-            pl.ylim(0,1)
-            """
-            pl.xticks(fontsize=10)
-            pl.yticks(fontsize=10)
-
-            pl.tight_layout()
-            pl.draw()
-
-            outname =  str(f)+".png"
-            #pl.savefig(outname)
 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, data1, data2, dataMaxRange, dataDimen, winSize):
@@ -420,24 +290,6 @@ class CCA(QtGui.QWidget):
         #UIの初期化
         self.initUI()
 
-        #ROSのパブリッシャなどの初期化
-        rospy.init_node('roscca', anonymous=True)
-        self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
-
-        #rvizのカラー設定(未)
-        self.carray = []
-        clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
-        for c in clist:
-            color = ColorRGBA()
-            color.r = c[0]
-            color.g = c[1]
-            color.b = c[2]
-            color.a = c[3]
-            self.carray.append(color) 
-
-
-
     def initUI(self):
         grid = QtGui.QGridLayout()
         form = QtGui.QFormLayout()
@@ -461,7 +313,7 @@ class CCA(QtGui.QWidget):
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('140')
+        self.frmSizeBox.setText('110')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -532,8 +384,7 @@ class CCA(QtGui.QWidget):
         print "now viz r:",r,", c:",c
         print "cca:",self.r_m[r][c]
         #GRAPH().drawPlot(r, c, self.wx_m, self.wy_m, self.r_m, self.data1, self.data2, self.dtmr, self.dtd, self.wins)
-        GRAPH().vecPlotSave(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
-        #GRAPH().vecPlot2(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
+        GRAPH().vecPlot(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.frms, self.wins)
         
     def updateTable(self):
         #GRAPH().rhoPlot(self.r_m, self.filename, self.wins, self.frms)
@@ -670,7 +521,7 @@ class CCA(QtGui.QWidget):
         #rho_m:rho_matrix[dmr, dmr, datadimen] is corrs
         #wx_m and wy_m is vectors
 
-        s = 0
+        s = 1
         r_m = np.zeros([self.dtmr, self.dtmr, self.dtd])
         wx_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])
         wy_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])

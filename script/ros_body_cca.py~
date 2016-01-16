@@ -22,7 +22,11 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
 
-import pylab as pl
+#import pylab as pl
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as pl
+import matplotlib.animation as animation
+
 import rospy
 
 import pyper
@@ -116,7 +120,7 @@ class GRAPH(QtGui.QWidget):
         pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
 
         #print np.mean(pWx*pWx, axis=0)
-        sqWx = np.sqrt(pWx * pWx)
+        sqWx = np.sqrt(pWx * pWx)/1.1
         print sqWx
         r,c = sqWx.shape
         x = pl.arange(c+1)
@@ -231,80 +235,7 @@ class GRAPH(QtGui.QWidget):
 
         pl.draw()
 
-        #outname =  "_" + str(winsize) + "_" + str(framesize)+".png"
-        #pl.savefig(outname)
-
         #print "pWx shape:",pWx.shape
-
-
-    def vecPlotSave(self, row, col, r_m, mWx, mWy, data1, data2, dtmr, frmSize, winSize):
-
-        pl.clf()
-        pl.ion()
-
-        #pWy = mWy[row][col]
-        #まずはx方向のWx
-        lg = dtmr - (frmSize-winSize)*2
-        pWxs=[]
-        #pWys=[]
-        for f in range(lg):
-            print str(f),"/",str(lg),"--- row:",row+f,", col:",col+f
-            pWx=mWx[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            sqWx = np.fabs(pWx)
-            #eigWx = 
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,0),rowspan=2)
-            pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_1 (t:"+str(row+f)+")")
-            pl.gray()
-
-            pWy = mWy[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            #pWy = pWx
-            #sqWy = np.dot(np.diag(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0]),np.fabs(pWy))
-            sqWy = np.fabs(pWy)
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,1),rowspan=2)
-            pl.pcolor(X, Y, sqWy,vmin=0, vmax=1)    
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_2 (t:"+str(col+f)+"-"+str((frmSize-winSize+1)+row+f)+")")
-            pl.gray()
-        
-            #固有値をとってみる
-            xl = np.arange(r)
-            #xl = np.arange(c)
-            
-            pl.subplot2grid((3,2),(2,0),colspan=2)
-            #pl.bar(xl, np.mean(sqWx, axis=0))
-            #pl.bar(xl, r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            #pl.plot(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            cc = r_m[row+f,col+f:(frmSize-winSize+1)+row+f,:]
-            X, Y = pl.meshgrid(pl.arange(r+1), pl.arange(c+1))
-            pl.pcolor(X, Y, cc.T, vmin=0, vmax=1)
-            pl.xlim(0,r)
-            pl.ylim(0,c)
-            pl.colorbar()
-            #pl.ylim(0.85,1)
-            """
-            pl.subplot2grid((2,2),(1,1))
-            pl.bar(xl, np.mean(sqWy, axis=0))
-            pl.xlim(0,c)
-            pl.ylim(0,1)
-            """
-            pl.xticks(fontsize=10)
-            pl.yticks(fontsize=10)
-
-            pl.tight_layout()
-            pl.draw()
-
-            outname =  str(f)+".png"
-            #pl.savefig(outname)
 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, data1, data2, dataMaxRange, dataDimen, winSize):
@@ -461,7 +392,7 @@ class CCA(QtGui.QWidget):
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('140')
+        self.frmSizeBox.setText('110')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -530,9 +461,12 @@ class CCA(QtGui.QWidget):
         r = cItem.row()
         c = cItem.column()
         print "now viz r:",r,", c:",c
-        print "cca:",self.r_m[r][c]
+        #print "cca:",self.r_m[r][c]
+        pj1 = self.wx_m[r,c,:,0].argmax()
+        pj2 = self.wy_m[r,c,:,0].argmax()
+        self.doPub(r, c, self.pos1, self.pos2, self.wins, pj1, pj2)
         #GRAPH().drawPlot(r, c, self.wx_m, self.wy_m, self.r_m, self.data1, self.data2, self.dtmr, self.dtd, self.wins)
-        GRAPH().vecPlotSave(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
+        #GRAPH().vecPlot(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.frms, self.wins)
         #GRAPH().vecPlot2(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
         
     def updateTable(self):
@@ -593,7 +527,7 @@ class CCA(QtGui.QWidget):
         #print "setect joints:"+str(hitbtn)
         #input file
         filename = self.txtSepFile.text()
-        self.data1, self.data2 = self.jsonInput(filename)
+        self.data1,self.data2,self.pos1,self.pos2,self.time = self.jsonInput(filename)
         #select joints
         if hitbtn == True: 
             self.data1, self.data2 = self.selectInput(self.data1, self.data2)
@@ -620,6 +554,7 @@ class CCA(QtGui.QWidget):
         f = open(filename, 'r')
         jsonData = json.load(f)
         f.close()
+        #angle
         datas = []
         for user in jsonData:
             #data is joint angle
@@ -630,7 +565,32 @@ class CCA(QtGui.QWidget):
             for j in range(self.dts):
                 data.append(user["datas"][j]["data"])
             datas.append(data)
-        return datas[0], datas[1]
+
+        poses = []
+        for user in jsonData:
+            pos = []
+            psize = len(user["datas"][0]["jdata"])
+            for j in range(self.dts):
+                pls = []
+                for p in range(psize):
+                    pl = []
+                    for xyz in range(3):
+                        pl.append(user["datas"][j]["jdata"][p][xyz])
+                    pls.append(pl)
+                pos.append(pls)
+            poses.append(pos)
+
+        #time ただし1.14現在,値が入ってない
+        time = []
+        for t in jsonData[0]["datas"]:
+            time.append(t["time"])
+
+        #print "poses[0]:",poses[0]
+
+        return datas[0], datas[1], poses[0], poses[1], time
+
+    #def jsonPosInput(self, filename):
+        
 
     def selectInput(self, data1, data2):
         idx = [3, 4, 5, 6, 11, 12, 23, 24, 25, 26, 27, 28]
@@ -916,6 +876,128 @@ class CCA(QtGui.QWidget):
         Wy = r.Wy
 
         return lambs, Wx, Wy
+
+    
+    def doPub(self, r, c, pos1, pos2, wins, p1, p2):
+        print "---play back start---"
+        print p1
+        print p2
+        #if (r-c) > 0:
+        self.vizPose(pos1[r:r+wins], pos2[c:c+wins], wins, p1, p2)
+
+        print "---play back end---"
+        print " "
+
+    def vizPose(self,pos1, pos2, wins, p1, p2):
+
+        fig = pl.figure()
+        ax = fig.add_subplot(111,projection='3d')
+        
+        datas = []
+        for i in range(wins):
+            for j in range(len(pos1[i])):
+                im = ax.scatter(pos1[i][j][0],pos1[i][j][1],pos1[i][j][2],c="r")
+                datas.append([im])
+                #datas.append(ax.scatter(pos2[i][j][0],pos2[i][j][1],pos2[i][j][2],c="g"))
+
+        ani = animation.FuncAnimation(fig, datas, interval=0.1,repeat_delay=1000)
+
+        pl.show()
+        """
+        for i in range(wins):
+            pl.clf()
+            for j in range(len(pos1[i])):
+                ax.scatter(pos1[i][j][0],pos1[i][j][1],pos1[i][j][2])
+                pl.draw()
+                time.sleep(.1)
+        """
+
+    def pubViz(self, pos1, pos2, wins, p1, p2):
+
+        rate = rospy.Rate(10)
+        #print "pos1[0]:",pos1[0]
+
+        
+        for i in range(wins):
+
+            msgs = MarkerArray()
+            
+            #use1について
+            msg = Marker()
+            #markerのプロパティ
+            msg.header.frame_id = 'camera_link'
+            msg.header.stamp = rospy.Time.now()
+            msg.ns = 'j1'
+            msg.action = 0
+            msg.id = 1
+            msg.type = 8
+            msg.scale.x = 0.1
+            msg.scale.y = 0.1
+            msg.color = self.carray[2]
+            #ジョイントポイントを入れる処理
+            for j in range(len(pos1[i])):
+                if j != p1:
+                    point = Point()
+                    point.x = pos1[i][j][0]
+                    point.y = pos1[i][j][1]
+                    point.z = pos1[i][j][2]
+                    msg.points.append(point)
+ 
+            msg.pose.orientation.w = 1.0
+            msgs.markers.append(msg)    
+        
+            msg = Marker()
+            msg.header.frame_id = 'camera_link'
+            msg.header.stamp = rospy.Time.now()
+            msg.ns = 'j2'
+            msg.action = 0
+            msg.id = 2
+            msg.type = 8
+            msg.scale.x = 0.1
+            msg.scale.y = 0.1
+            msg.color = self.carray[1]
+
+            for j in range(len(pos2[i])):
+                if j != p2:
+                    point = Point()
+                    point.x = pos2[i][j][0]
+                    point.y = pos2[i][j][1]
+                    point.z = pos2[i][j][2]
+                    msg.points.append(point) 
+            msg.pose.orientation.w = 1.0
+            msgs.markers.append(msg)
+            
+            msg = Marker()
+            msg.header.frame_id = 'camera_link'
+            msg.header.stamp = rospy.Time.now()
+            msg.ns = 'j3'
+            msg.action = 0
+            msg.id = 3
+            msg.type = 8
+            msg.scale.x = 0.1
+            msg.scale.y = 0.1
+            msg.color = self.carray[0]
+
+            #for j in range(len(pos2[i])):
+            point = Point()
+            point.x = pos1[i][p1][0]
+            point.y = pos1[i][p1][1]
+            point.z = pos1[i][p1][2]
+            msg.points.append(point) 
+            point = Point()
+            point.x = pos2[i][p1][0]
+            point.y = pos2[i][p1][1]
+            point.z = pos2[i][p1][2]
+            msg.points.append(point) 
+            msg.pose.orientation.w = 1.0
+            msgs.markers.append(msg)
+            #print "msgs:",msgs
+            
+            
+
+            self.mpub.publish(msgs)
+            rate.sleep()
+        
 
 def main():
     app = QtGui.QApplication(sys.argv)

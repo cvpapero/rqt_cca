@@ -2,6 +2,10 @@
 # -*- coding: utf-8 -*-
 
 """
+2016.1.13
+グラフをGUIとくっつける
+グラフの保存機能
+
 2016.1.11
 決定版をつくる
 
@@ -23,18 +27,13 @@ from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
 
 import pylab as pl
-import rospy
-
-import pyper
-import pandas as pd
+import matplotlib.backends.backend_qt4agg as mbb_qt
+import matplotlib.backends.backend_agg as mbb_agg
 
 import rospy
-from visualization_msgs.msg import MarkerArray
-from visualization_msgs.msg import Marker
-from geometry_msgs.msg import Point
-from geometry_msgs.msg import PointStamped
-from std_msgs.msg import ColorRGBA
 
+#import pyper
+#import pandas as pd
 
 class GRAPH(QtGui.QWidget):
     def __init__(self):
@@ -59,54 +58,6 @@ class GRAPH(QtGui.QWidget):
         pl.savefig(outname)
 
 
-    def vecPlot2(self, row, col, r_m, mWx, mWy, data1, data2, dmr, frmSize, winSize):
-        pl.clf()
-        pl.ion()
-        pWx = []
-        l = dmr - row - col
-        for f in range(l):
-            pWx.append(mWx[row+f, col+f,:,0])
-        pWx = np.array(pWx)
-
-        sqWx = np.sqrt(pWx * pWx)
-        print sqWx
-        r,c = sqWx.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,0))
-        pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_1 (t:"+str(row)+")")
-        pl.gray()
-
-        pWy = []
-        l = dmr - row - col
-        for f in range(l):
-            pWy.append(mWy[row+f, col+f,:,0])
-        pWy = np.array(pWy)
-
-        sqWy = np.sqrt(pWy * pWy)
-        print sqWy
-        r,c = sqWy.shape
-        x = pl.arange(c+1)
-        y = pl.arange(r+1)
-        X, Y = pl.meshgrid(x, y)
-
-        pl.subplot2grid((1,2),(0,1))
-        pl.pcolor(X, Y, sqWy, vmin=0, vmax=1)
-        pl.xlim(0,c)
-        pl.ylim(0,r)
-        pl.colorbar()
-        pl.title("user_2 (t:"+str(col)+")")
-        pl.gray()
-
-        pl.tight_layout()
-        pl.draw()
-
     def vecPlot(self, row, col, r_m, mWx, mWy, data1, data2, frmSize, winSize):
         pl.clf()
         pl.ion()
@@ -114,10 +65,9 @@ class GRAPH(QtGui.QWidget):
         #pWy = mWy[row][col]
         #まずはx方向のWx
         pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
-
+        #print "pWx sum:",np.sum(pWx[0,:])
         #print np.mean(pWx*pWx, axis=0)
         sqWx = np.sqrt(pWx * pWx)
-        print sqWx
         r,c = sqWx.shape
         x = pl.arange(c+1)
         y = pl.arange(r+1)
@@ -231,80 +181,7 @@ class GRAPH(QtGui.QWidget):
 
         pl.draw()
 
-        #outname =  "_" + str(winsize) + "_" + str(framesize)+".png"
-        #pl.savefig(outname)
-
         #print "pWx shape:",pWx.shape
-
-
-    def vecPlotSave(self, row, col, r_m, mWx, mWy, data1, data2, dtmr, frmSize, winSize):
-
-        pl.clf()
-        pl.ion()
-
-        #pWy = mWy[row][col]
-        #まずはx方向のWx
-        lg = dtmr - (frmSize-winSize)*2
-        pWxs=[]
-        #pWys=[]
-        for f in range(lg):
-            print str(f),"/",str(lg),"--- row:",row+f,", col:",col+f
-            pWx=mWx[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            sqWx = np.fabs(pWx)
-            #eigWx = 
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,0),rowspan=2)
-            pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_1 (t:"+str(row+f)+")")
-            pl.gray()
-
-            pWy = mWy[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            #pWy = pWx
-            #sqWy = np.dot(np.diag(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0]),np.fabs(pWy))
-            sqWy = np.fabs(pWy)
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,1),rowspan=2)
-            pl.pcolor(X, Y, sqWy,vmin=0, vmax=1)    
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_2 (t:"+str(col+f)+"-"+str((frmSize-winSize+1)+row+f)+")")
-            pl.gray()
-        
-            #固有値をとってみる
-            xl = np.arange(r)
-            #xl = np.arange(c)
-            
-            pl.subplot2grid((3,2),(2,0),colspan=2)
-            #pl.bar(xl, np.mean(sqWx, axis=0))
-            #pl.bar(xl, r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            #pl.plot(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            cc = r_m[row+f,col+f:(frmSize-winSize+1)+row+f,:]
-            X, Y = pl.meshgrid(pl.arange(r+1), pl.arange(c+1))
-            pl.pcolor(X, Y, cc.T, vmin=0, vmax=1)
-            pl.xlim(0,r)
-            pl.ylim(0,c)
-            pl.colorbar()
-            #pl.ylim(0.85,1)
-            """
-            pl.subplot2grid((2,2),(1,1))
-            pl.bar(xl, np.mean(sqWy, axis=0))
-            pl.xlim(0,c)
-            pl.ylim(0,1)
-            """
-            pl.xticks(fontsize=10)
-            pl.yticks(fontsize=10)
-
-            pl.tight_layout()
-            pl.draw()
-
-            outname =  str(f)+".png"
-            #pl.savefig(outname)
 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, data1, data2, dataMaxRange, dataDimen, winSize):
@@ -420,24 +297,6 @@ class CCA(QtGui.QWidget):
         #UIの初期化
         self.initUI()
 
-        #ROSのパブリッシャなどの初期化
-        rospy.init_node('roscca', anonymous=True)
-        self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
-        self.ppub = rospy.Publisher('joint_diff', PointStamped, queue_size=10)
-
-        #rvizのカラー設定(未)
-        self.carray = []
-        clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
-        for c in clist:
-            color = ColorRGBA()
-            color.r = c[0]
-            color.g = c[1]
-            color.b = c[2]
-            color.a = c[3]
-            self.carray.append(color) 
-
-
-
     def initUI(self):
         grid = QtGui.QGridLayout()
         form = QtGui.QFormLayout()
@@ -461,7 +320,7 @@ class CCA(QtGui.QWidget):
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('140')
+        self.frmSizeBox.setText('110')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -505,10 +364,25 @@ class CCA(QtGui.QWidget):
         boxTable = QtGui.QHBoxLayout()
         boxTable.addWidget(self.table)
  
+        #結果グラフの描画
+        #gWidget = QtGui.QHBoxLayout()
+        graph = QtGui.QVBoxLayout()
+        fig = pl.Figure()
+        axes = fig.add_subplot(111)
+        x = np.arange(0.0, 3.0, 0.01)
+        y = np.cos(1*np.pi*x)
+        axes.plot(x, y)
+        self.qmc = mbb_qt.FigureCanvasQTAgg(fig)
+
+        graph.addWidget(self.qmc)
+        #ntb = mbb_qt.Navi
+        
+
         #配置
         grid.addLayout(form,1,0)
         grid.addLayout(boxCtrl,2,0)
         grid.addLayout(boxTable,3,0)
+        grid.addLayout(graph,4,0)
 
         self.setLayout(grid)
         self.resize(400,100)
@@ -532,8 +406,7 @@ class CCA(QtGui.QWidget):
         print "now viz r:",r,", c:",c
         print "cca:",self.r_m[r][c]
         #GRAPH().drawPlot(r, c, self.wx_m, self.wy_m, self.r_m, self.data1, self.data2, self.dtmr, self.dtd, self.wins)
-        GRAPH().vecPlotSave(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
-        #GRAPH().vecPlot2(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
+        GRAPH().vecPlot(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.frms, self.wins)
         
     def updateTable(self):
         #GRAPH().rhoPlot(self.r_m, self.filename, self.wins, self.frms)
@@ -670,7 +543,7 @@ class CCA(QtGui.QWidget):
         #rho_m:rho_matrix[dmr, dmr, datadimen] is corrs
         #wx_m and wy_m is vectors
 
-        s = 0
+        s = 1
         r_m = np.zeros([self.dtmr, self.dtmr, self.dtd])
         wx_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])
         wy_m = np.zeros([self.dtmr, self.dtmr, self.dtd, self.dtd])
@@ -712,8 +585,9 @@ class CCA(QtGui.QWidget):
             r,x,y = self.cca1(u1, u2)
             return r, x, y
         else:
-            r,x,y = self.cca2(u1, u2)
-            return r, x, y
+            pass
+            #r,x,y = self.cca2(u1, u2)
+            #return r, x, y
 
 
     def cca1(self, u1, u2):
@@ -834,88 +708,6 @@ class CCA(QtGui.QWidget):
         #print np.dot(np.dot(A[:,0].T,SXX),A[:,0])
         return s, A, B
 
-    def cca2(self, X, Y):
-        #係数が1以下にならない...??
-        #row:window size, col:data dimen
-        X = np.array(X)
-        Y = np.array(Y)
-        n, p = X.shape
-        n, q = Y.shape
-        #print X.shape
-        # std
-        X = (X - X.mean(axis=0))/X.std(axis=0)
-        Y = (Y - Y.mean(axis=0))/X.std(axis=0)
-
-        R = np.corrcoef(X.T,Y.T)
-
-        R11 = R[:p,:p]
-        R12 = R[:p,p:]
-        R22 = R[p:,:p]
-        #print R.shape
-        #print R11.shape
-        # print R12.shape
-        #print R22.shape
-
-        A = np.dot(np.dot(np.dot(NLA.inv(R11),R12),NLA.inv(R22)),R12.T)
-        lambs, wx = NLA.eig(A)
-        #順番の入れ替え
-        #print "bf lambs:",lambs
-        #print "wx:",wx
-        idx = lambs.argsort()[::-1]
-        lambs = np.sqrt(lambs[idx])
-        wx = wx[:,idx]
-        wy = np.dot(np.dot(NLA.inv(R22), R12.T), NLA.inv(np.diag(lambs)))
-
-        return lambs, wx, wy
-
-    def ccaR(self, U1, U2):
-
-        r = pyper.R(use_pandas='True')
-
-        for i, u in enumerate(U1):
-            out = "x"+str(i)+"<-c(" 
-            for j, el in enumerate(u):
-                if j != len(u)-1:
-                    out += str(el)+", "
-                else:
-                    out += str(el)+")"
-            r(out)
-                    
-        for i, u in enumerate(U2):
-            out = "y"+str(i)+"<-c(" 
-            for j, el in enumerate(u):
-                if j != len(u)-1:
-                    out += str(el)+", "
-                else:
-                    out += str(el)+")"
-            r(out)
-
-        out = "f<-rbind("            
-        for i in range(len(U1)):
-            if i != len(U1)-1:
-                out += "x"+str(i)+","
-            else:
-                out += "x"+str(i)+")"
-        r(out)
-
-        out = "g<-rbind("            
-        for i in range(len(U2)):
-            if i != len(U2)-1:
-                out += "y"+str(i)+","
-            else:
-                out += "y"+str(i)+")"
-        r(out)
-
-        r("can <- cancor(f,g)")
-        r("lambs <- can$cor")
-        r("Wx <- can$xcoef")
-        r("Wy <- can$ycoef")
-
-        lambs = r.lambs
-        Wx = r.Wx
-        Wy = r.Wy
-
-        return lambs, Wx, Wy
 
 def main():
     app = QtGui.QApplication(sys.argv)

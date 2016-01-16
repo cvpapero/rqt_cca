@@ -22,7 +22,11 @@ from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import *
 from PyQt4.QtGui  import *
 
-import pylab as pl
+#import pylab as pl
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as pl
+import matplotlib.animation as animation
+
 import rospy
 
 import pyper
@@ -116,7 +120,7 @@ class GRAPH(QtGui.QWidget):
         pWx = mWx[row,col:(frmSize-winSize+1)+row,:,0]
 
         #print np.mean(pWx*pWx, axis=0)
-        sqWx = np.sqrt(pWx * pWx)
+        sqWx = np.sqrt(pWx * pWx)/1.1
         print sqWx
         r,c = sqWx.shape
         x = pl.arange(c+1)
@@ -231,80 +235,7 @@ class GRAPH(QtGui.QWidget):
 
         pl.draw()
 
-        #outname =  "_" + str(winsize) + "_" + str(framesize)+".png"
-        #pl.savefig(outname)
-
         #print "pWx shape:",pWx.shape
-
-
-    def vecPlotSave(self, row, col, r_m, mWx, mWy, data1, data2, dtmr, frmSize, winSize):
-
-        pl.clf()
-        pl.ion()
-
-        #pWy = mWy[row][col]
-        #まずはx方向のWx
-        lg = dtmr - (frmSize-winSize)*2
-        pWxs=[]
-        #pWys=[]
-        for f in range(lg):
-            print str(f),"/",str(lg),"--- row:",row+f,", col:",col+f
-            pWx=mWx[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            sqWx = np.fabs(pWx)
-            #eigWx = 
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,0),rowspan=2)
-            pl.pcolor(X, Y, sqWx, vmin=0, vmax=1)
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_1 (t:"+str(row+f)+")")
-            pl.gray()
-
-            pWy = mWy[row+f,col+f:(frmSize-winSize+1)+row+f,:,0]
-            #pWy = pWx
-            #sqWy = np.dot(np.diag(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0]),np.fabs(pWy))
-            sqWy = np.fabs(pWy)
-            r,c = sqWx.shape
-            X, Y = pl.meshgrid(pl.arange(c+1), pl.arange(r+1))
-            pl.subplot2grid((3,2),(0,1),rowspan=2)
-            pl.pcolor(X, Y, sqWy,vmin=0, vmax=1)    
-            pl.xlim(0,c)
-            pl.ylim(0,r)
-            pl.colorbar()
-            pl.title("user_2 (t:"+str(col+f)+"-"+str((frmSize-winSize+1)+row+f)+")")
-            pl.gray()
-        
-            #固有値をとってみる
-            xl = np.arange(r)
-            #xl = np.arange(c)
-            
-            pl.subplot2grid((3,2),(2,0),colspan=2)
-            #pl.bar(xl, np.mean(sqWx, axis=0))
-            #pl.bar(xl, r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            #pl.plot(r_m[row+f,col+f:(frmSize-winSize+1)+row+f,0])
-            cc = r_m[row+f,col+f:(frmSize-winSize+1)+row+f,:]
-            X, Y = pl.meshgrid(pl.arange(r+1), pl.arange(c+1))
-            pl.pcolor(X, Y, cc.T, vmin=0, vmax=1)
-            pl.xlim(0,r)
-            pl.ylim(0,c)
-            pl.colorbar()
-            #pl.ylim(0.85,1)
-            """
-            pl.subplot2grid((2,2),(1,1))
-            pl.bar(xl, np.mean(sqWy, axis=0))
-            pl.xlim(0,c)
-            pl.ylim(0,1)
-            """
-            pl.xticks(fontsize=10)
-            pl.yticks(fontsize=10)
-
-            pl.tight_layout()
-            pl.draw()
-
-            outname =  str(f)+".png"
-            #pl.savefig(outname)
 
 
     def drawPlot(self, row, col, mWx, mWy, ccaMat, data1, data2, dataMaxRange, dataDimen, winSize):
@@ -420,6 +351,8 @@ class CCA(QtGui.QWidget):
         #UIの初期化
         self.initUI()
 
+
+
         #ROSのパブリッシャなどの初期化
         rospy.init_node('roscca', anonymous=True)
         self.mpub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size=10)
@@ -427,7 +360,7 @@ class CCA(QtGui.QWidget):
 
         #rvizのカラー設定(未)
         self.carray = []
-        clist = [[1,1,0,1],[0,1,0,1],[1,0,0,1]]
+        clist = [[1,0,0,1],[0,1,0,1],[1,1,0,1]]
         for c in clist:
             color = ColorRGBA()
             color.r = c[0]
@@ -461,7 +394,7 @@ class CCA(QtGui.QWidget):
 
         #frame size
         self.frmSizeBox = QtGui.QLineEdit()
-        self.frmSizeBox.setText('140')
+        self.frmSizeBox.setText('110')
         self.frmSizeBox.setAlignment(QtCore.Qt.AlignRight)
         self.frmSizeBox.setFixedWidth(100)
         form.addRow('frame size', self.frmSizeBox)
@@ -471,18 +404,30 @@ class CCA(QtGui.QWidget):
         form.addRow('dimension', self.selected)
 
         #tableに表示する相関係数のしきい値
-        self.ThesholdBox = QtGui.QLineEdit()
-        self.ThesholdBox.setText('0.0')
-        self.ThesholdBox.setAlignment(QtCore.Qt.AlignRight)
-        self.ThesholdBox.setFixedWidth(100)
-
-        btnUpDate =  QtGui.QPushButton('update')
-        btnUpDate.setMaximumWidth(100)
-        btnUpDate.clicked.connect(self.updateTable)
-        boxUpDate = QtGui.QHBoxLayout()
+        """
+        self.rowBox = QtGui.QLineEdit()
+        self.rowBox.setText('0')
+        self.rowBox.setAlignment(QtCore.Qt.AlignRight)
+        self.rowBox.setFixedWidth(50)
+        #改造
+        btnUp =  QtGui.QPushButton('up')
+        btnUp.setMaximumWidth(50)
+        btnUp.clicked.connect(self.dataUp)
+        btnDown =  QtGui.QPushButton('down')
+        btnDown.setMaximumWidth(50)
+        btnDown.clicked.connect(self.dataDown)
+        boxUpDownRow = QtGui.QHBoxLayout()
         boxUpDate.addWidget(self.ThesholdBox)
-        boxUpDate.addWidget(btnUpDate)
+        boxUpDate.addWidget(btnUp)
         form.addRow('corr theshold', boxUpDate)
+        """
+        boxUpDown = QtGui.QHBoxLayout()
+        btnUp = QtGui.QPushButton('up')
+        btnUp.clicked.connect(self.dtUp)
+        btnDown = QtGui.QPushButton('down')
+        btnDown.clicked.connect(self.dtDown)
+        boxUpDown.addWidget(btnUp)
+        boxUpDown.addWidget(btnDown)
 
         #exec
         boxCtrl = QtGui.QHBoxLayout()
@@ -508,7 +453,8 @@ class CCA(QtGui.QWidget):
         #配置
         grid.addLayout(form,1,0)
         grid.addLayout(boxCtrl,2,0)
-        grid.addLayout(boxTable,3,0)
+        grid.addLayout(boxUpDown,3,0)
+        grid.addLayout(boxTable,4,0)
 
         self.setLayout(grid)
         self.resize(400,100)
@@ -527,17 +473,50 @@ class CCA(QtGui.QWidget):
         return self.txtSepFile.setText('')
 
     def updateColorTable(self, cItem):
-        r = cItem.row()
-        c = cItem.column()
-        print "now viz r:",r,", c:",c
-        print "cca:",self.r_m[r][c]
+        self.r = cItem.row()
+        self.c = cItem.column()
+        print "now viz r:",self.r,", c:",self.c
+        #print "cca:",self.r_m[r][c]
+
+        #pj1 = self.wx_m[self.r,self.c,:,0].argmax()
+        #pj2 = self.wy_m[self.r,self.c,:,0].argmax()
+        th = 0.7
+        p1 = []
+        p2 = []
+        for idx,v in enumerate(self.wx_m[self.r,self.c,:,0]):
+            if v > th:
+                iv=[]
+                iv.append(idx)
+                iv.append(v)
+                p1.append(iv)
+        for idx,v in enumerate(self.wx_m[self.r,self.c,:,0]):
+            if v > th:
+                iv=[]
+                iv.append(idx)
+                iv.append(v)
+                p2.append(iv)
+
+        if len(p1) == 0:
+            iv=[]
+            iv.append(self.wx_m[self.r,self.c,:,0].argmax())
+            iv.append(self.wx_m[self.r,self.c,:,0].max())
+            p1.append(iv)
+        if len(p2) == 0:
+            iv=[]
+            iv.append(self.wy_m[self.r,self.c,:,0].argmax())
+            iv.append(self.wy_m[self.r,self.c,:,0].max())
+            p2.append(iv)
+
+        self.doPub(self.r, self.c, self.pos1, self.pos2, self.wins, p1, p2)
+        #self.doViz()
+        #self.doViz(self.r, self.c, self.pos1, self.pos2, self.wins, pj1, pj2)
         #GRAPH().drawPlot(r, c, self.wx_m, self.wy_m, self.r_m, self.data1, self.data2, self.dtmr, self.dtd, self.wins)
-        GRAPH().vecPlotSave(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
+        #GRAPH().vecPlot(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.frms, self.wins)
         #GRAPH().vecPlot2(r, c, self.r_m, self.wx_m, self.wy_m, self.data1, self.data2, self.dtmr, self.frms, self.wins)
         
     def updateTable(self):
         #GRAPH().rhoPlot(self.r_m, self.filename, self.wins, self.frms)
-        th = float(self.ThesholdBox.text())
+        th = 0#float(self.ThesholdBox.text())
         if(len(self.r_m)==0):
             print "No Corr Data! Push exec button..."
         self.table.clear()
@@ -577,6 +556,8 @@ class CCA(QtGui.QWidget):
         self.table.resizeColumnsToContents()
         self.table.setVisible(True)
 
+
+
     def doExec(self):
         #print "exec!"
 
@@ -593,7 +574,7 @@ class CCA(QtGui.QWidget):
         #print "setect joints:"+str(hitbtn)
         #input file
         filename = self.txtSepFile.text()
-        self.data1, self.data2 = self.jsonInput(filename)
+        self.data1,self.data2,self.pos1,self.pos2,self.time = self.jsonInput(filename)
         #select joints
         if hitbtn == True: 
             self.data1, self.data2 = self.selectInput(self.data1, self.data2)
@@ -620,6 +601,7 @@ class CCA(QtGui.QWidget):
         f = open(filename, 'r')
         jsonData = json.load(f)
         f.close()
+        #angle
         datas = []
         for user in jsonData:
             #data is joint angle
@@ -630,7 +612,43 @@ class CCA(QtGui.QWidget):
             for j in range(self.dts):
                 data.append(user["datas"][j]["data"])
             datas.append(data)
-        return datas[0], datas[1]
+
+        poses = []
+        for user in jsonData:
+            pos = []
+            psize = len(user["datas"][0]["jdata"])
+            for j in range(self.dts):
+                pls = []
+                for p in range(psize):
+                    pl = []
+                    for xyz in range(3):
+                        pl.append(user["datas"][j]["jdata"][p][xyz])
+                    pls.append(pl)
+                pos.append(pls)
+            poses.append(pos)
+
+        #time ただし1.14現在,値が入ってない
+        time = []
+        for t in jsonData[0]["datas"]:
+            time.append(t["time"])
+
+        #print "poses[0]:",poses[0]
+
+        #可視化用,ジョイント
+        f = open('/home/uema/catkin_ws/src/rqt_cca/joint_index.json', 'r')
+        jsonIdxDt = json.load(f)
+        f.close
+        self.jIdx = []
+        for idx in jsonIdxDt:
+            jl = []
+            for i in idx:
+                jl.append(i)
+            self.jIdx.append(jl)
+
+        return datas[0], datas[1], poses[0], poses[1], time
+
+    #def jsonPosInput(self, filename):
+        
 
     def selectInput(self, data1, data2):
         idx = [3, 4, 5, 6, 11, 12, 23, 24, 25, 26, 27, 28]
@@ -916,6 +934,133 @@ class CCA(QtGui.QWidget):
         Wy = r.Wy
 
         return lambs, Wx, Wy
+
+    
+    def dtUp(self):
+        self.r = self.r-1
+        self.c = self.c-1
+        print "now viz r:",self.r,", c:",self.c
+        self.doViz()
+
+    def dtDown(self):
+        self.r = self.r+1
+        self.c = self.c+1
+        print "now viz r:",self.r,", c:",self.c
+        self.doViz()
+
+    def doViz(self):
+        #self.pos1, self.pos2, self.wins
+        pj1 = self.wx_m[self.r,self.c,:,0].argmax()
+        pj2 = self.wy_m[self.r,self.c,:,0].argmax()
+
+        pl.ion()
+        #self.fig = pl.figure()
+        #ax = self.fig.add_subplot(111,projection='3d')
+        pl.subplot(111,projection='3d')
+        p1 = np.array(self.pos1[self.r])
+        pl.scatter(p1[0:self.dtd,0],p1[0:self.dtd,1],p1[0:self.dtd,2],c="r")
+        #self.updateViz()
+        pl.draw()
+
+    def doPub(self, r, c, pos1, pos2, wins, p1, p2):
+        print "---play back start---"
+        print p1
+        print p2
+        if r > c:
+            self.pubViz(r, c, pos1[c:r+wins], pos2[c:r+wins], wins, p1, p2)
+        else:
+            self.pubViz(r, c, pos1[r:c+wins], pos2[r:c+wins], wins, p1, p2)
+        print "---play back end---"
+        print " "
+
+    #データを可視化するだけでok
+    def pubViz(self, r, c, pos1, pos2, wins, p1, p2):
+
+        rate = rospy.Rate(10)
+        #print "pos1[0]:",pos1[0]
+        poses = []
+        poses.append(pos1)
+        poses.append(pos2)
+        ps = []
+        ps.append(p1)
+        ps.append(p2)
+        for i in range(len(poses[0])):
+            print "frame:",i
+            if i > r and i < r+wins:
+                print "now u1 output"
+            if i > c and i < c+wins:
+                print "now u2 output"
+
+            msgs = MarkerArray()
+            for u, pos in enumerate(poses):
+                #points
+                pmsg = Marker()
+                pmsg.header.frame_id = 'camera_link'
+                pmsg.header.stamp = rospy.Time.now()
+                pmsg.ns = 'p'+str(u)
+                pmsg.action = 0
+                pmsg.id = u
+                pmsg.type = 7
+                js = 0.03
+                pmsg.scale.x = js
+                pmsg.scale.y = js
+                pmsg.scale.z = js
+                pmsg.color = self.carray[u]
+                for j, p in enumerate(pos[i]):
+                    point = Point()
+                    point.x = p[0]
+                    point.y = p[1]
+                    point.z = p[2]
+                    pmsg.points.append(point)
+                pmsg.pose.orientation.w = 1.0
+                msgs.markers.append(pmsg)    
+
+                #note points その時が来たら、表示する(今は最初から上書きしてる)
+                npmsg = Marker()
+                npmsg.header.frame_id = 'camera_link'
+                npmsg.header.stamp = rospy.Time.now()
+                npmsg.ns = 'np'+str(u)
+                npmsg.action = 0
+                npmsg.id = u
+                npmsg.type = 7
+                njs = 0.05
+                npmsg.scale.x = njs
+                npmsg.scale.y = njs
+                npmsg.scale.z = njs
+                npmsg.color = self.carray[2]
+                for j in range(len(ps[u])):
+                    point = Point()
+                    point.x = pos[i][ps[u][j][0]][0]
+                    point.y = pos[i][ps[u][j][0]][1]
+                    point.z = pos[i][ps[u][j][0]][2]
+                    npmsg.points.append(point)
+                npmsg.pose.orientation.w = 1.0
+                msgs.markers.append(npmsg) 
+
+                #lines
+                lmsg = Marker()
+                lmsg.header.frame_id = 'camera_link'
+                lmsg.header.stamp = rospy.Time.now()
+                lmsg.ns = 'l'+str(u)
+                lmsg.action = 0
+                lmsg.id = u
+                lmsg.type = 5
+                lmsg.scale.x = 0.005
+                lmsg.color = self.carray[2]
+                for jid in self.jIdx:
+                    for pi in range(2):
+                        for add in range(2):
+                            point = Point()
+                            point.x = pos[i][jid[pi+add]][0]
+                            point.y = pos[i][jid[pi+add]][1]
+                            point.z = pos[i][jid[pi+add]][2]
+                            lmsg.points.append(point) 
+                lmsg.pose.orientation.w = 1.0
+                msgs.markers.append(lmsg)
+            
+            self.mpub.publish(msgs)
+            rate.sleep()
+        
 
 def main():
     app = QtGui.QApplication(sys.argv)
